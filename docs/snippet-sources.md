@@ -101,7 +101,7 @@ step; never a value), `kill-timeout`.
 
 The "Check it reproduces" column is the acceptance test (PLAN M1): a
 recipe for each real app must render a flk.toml whose
-`flk config show --json` `machine_config` equals the real one's
-(`flk config show --json -a APP`, read-only), and a Dockerfile that does
+`flk config show --json` `parsed` and `machine_config` equal the real
+one's (`flk config show --json -a APP`, read-only), and a Dockerfile that does
 the same steps. Byte-for-byte equality isn't the goal, but explain every
 difference in `testdata/`.

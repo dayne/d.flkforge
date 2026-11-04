@@ -35,8 +35,10 @@ writes files equivalent to `~/flk/examples/hello` (golden test), and
 
 **Accept:** for minecraft-flk, vintagestory-flk, valheim-flk,
 enshrouded-flk, mqtt-flk, ncm and opencode-sandbox, the rendered
-flk.toml's `machine_config` (from `flk config show --json`) equals the
-real app's (`flk config show --json -a APP`, read-only), and every
+flk.toml's `parsed` and `machine_config` (from `flk config show --json`)
+equal the real app's (`flk config show --json -a APP`, read-only;
+`machine_config` leaves out `[flk.backup]` and `keep_releases`, so compare
+both), and every
 Dockerfile difference is explained in a note next to the recipe.
 
 ## M2: The wizard

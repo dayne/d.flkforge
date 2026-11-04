@@ -5,8 +5,6 @@ depends on them; ask the user when it's their call.
 
 ## Decisions
 
-- (M0) Go module path: plain `flkforge` while the repo is local, or
-  `github.com/dayne/d.flkforge` now, to match lazyflk. Ask the user.
 - (M0) Final `snippet.toml` field names. The sketch in SPEC 4 is a
   starting point; settle it and update the SPEC.
 - (M0) Forms: `huh` (if a bubbletea-v2 version exists) or hand-built

@@ -10,7 +10,7 @@ per milestone; never push.
 
 ## M0: Skeleton and the format (no TUI)
 
-- `go mod init flkforge` (local module path for now; see TODO), Makefile
+- `go mod init github.com/dayne/d.flkforge` (the repo stays local for now), Makefile
   in lazyflk's style (`make`, `make build`, `make test`, `make install`).
 - A command table that drives parsing and help; `flkforge help`,
   `help --all [--json]`, `version`. Strict arguments.

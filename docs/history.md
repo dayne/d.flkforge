@@ -15,3 +15,5 @@ Designed in a flk session with Dayne, before any code. Decided:
 - v1 is the wizard and the CLI over snippets; the hub comes later, but
   ids, versions, locks and the Source interface are built for it from
   the start.
+- Go module path `github.com/dayne/d.flkforge`, matching lazyflk, even
+  while the repo has no remote (Dayne, 2026-11-04).

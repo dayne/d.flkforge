@@ -49,8 +49,10 @@ source is `~/flk/share/guide.md`, and the guides by stage are
   `FLK_RELEASE`. A snippet should rely only on documented ones. Check them
   on a test machine with `flk exec env`.
 - **The guest is a VM, not a container** (`~/flk/share/init.sh`, about
-  140 lines: read it). `/flk/init` is PID 1. It needs `/bin/sh` in the
-  image, so scratch and distroless images don't boot. It writes the
+  140 lines: read it). `/flk/init` is PID 1: that shell script when the
+  image has `/bin/sh`, otherwise the static flk agent (`~/flk/agent/init.go`),
+  which flk only has if Go was on the host when it built the agent. It
+  writes the
   hostname, `/etc/resolv.conf` and `/etc/hosts`, mounts the volumes, then
   runs the image's ENTRYPOINT/CMD as the one app. There's no systemd, so
   a daemon (sshd, cron) runs in the foreground, either as the app or
@@ -59,7 +61,8 @@ source is `~/flk/share/guide.md`, and the guides by stage are
   `chroot` that takes `--userspec`. Without either, it logs a warning and
   **runs the app as root**. Busybox images (Alpine) have neither, so a
   non-root user there needs an extra package (check the Alpine package
-  name).
+  name). The no-shell init switches users itself. A fix in flk is planned
+  (`~/flk/TODO.md`, Machines); until it lands, keep the rule.
 - **Getting a shell**: `flk ssh console` and `flk exec CMD` reach a
   running machine through flk's agent over vsock. No sshd or network is
   needed, and the image doesn't need anything for it (the

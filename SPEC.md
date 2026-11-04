@@ -245,7 +245,8 @@ real apps' history:
 - A wrapper with its own restart loop goes with `[[restart]] retries = 1`.
 - No secret value ever lands in a written file.
 - Short image names fail on podman without search registries.
-- The base must have `/bin/sh` (flk's init is a shell script).
+- A base without `/bin/sh` (scratch, distroless) boots only on flk's
+  static init, which needs flk's agent (Go on the host): warn, and say so.
 - A non-root user on a base without `setpriv` or `chroot --userspec`
   (busybox/Alpine) silently runs as root: add the package.
 - Nothing in the image may expect systemd, or manage the network,

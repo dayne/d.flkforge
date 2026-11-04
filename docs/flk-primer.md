@@ -46,7 +46,26 @@ source is `~/flk/share/guide.md`, and the guides by stage are
   `[flk] stdin = "null"`. When the app exits, the VM powers off.
 - **Env inside**: `[env]`, secrets, `FLY_APP_NAME`, `FLY_MACHINE_ID`,
   `FLY_PRIVATE_IP`, `FLY_REGION=local`, the `FLK_*` equivalents, and
-  `FLK_RELEASE`.
+  `FLK_RELEASE`. A snippet should rely only on documented ones. Check them
+  on a test machine with `flk exec env`.
+- **The guest is a VM, not a container** (`~/flk/share/init.sh`, about
+  140 lines: read it). `/flk/init` is PID 1. It needs `/bin/sh` in the
+  image, so scratch and distroless images don't boot. It writes the
+  hostname, `/etc/resolv.conf` and `/etc/hosts`, mounts the volumes, then
+  runs the image's ENTRYPOINT/CMD as the one app. There's no systemd, so
+  a daemon (sshd, cron) runs in the foreground, either as the app or
+  started by the run wrapper. Images shouldn't manage networking.
+  To run as a non-root `USER`, init needs `setpriv` (util-linux) or a
+  `chroot` that takes `--userspec`. Without either, it logs a warning and
+  **runs the app as root**. Busybox images (Alpine) have neither, so a
+  non-root user there needs an extra package (check the Alpine package
+  name).
+- **Getting a shell**: `flk ssh console` and `flk exec CMD` reach a
+  running machine through flk's agent over vsock. No sshd or network is
+  needed, and the image doesn't need anything for it (the
+  opencode-sandbox's idle CMD exists so there's a machine to land in). An
+  sshd in the image is only for clients that need real SSH, such as
+  editors' remote modes or other hosts.
 - **Stopping**: flk sends the app SIGTERM, then kills the VM after
   `kill_timeout` (default 10s, at most 300s). A server that has to save
   needs a longer `kill_timeout`, and a wrapper that turns SIGTERM into the
@@ -57,11 +76,21 @@ source is `~/flk/share/guide.md`, and the guides by stage are
   flk's policy is only an outer net, so a crash loop doesn't get
   multiplied.
 - **Volumes**: `[[mounts]] source = "data"` needs a volume named `data`
-  per machine (`flk volumes create data --size N`). A new volume's root is
-  owned by root. If the app runs as uid 1000, create the mount point in
-  the image owned by that user (`install -d -o ubuntu -g ubuntu /data`) so
-  a volume flk creates on its own takes that owner on first use
-  (valheim.flk BUGS #4).
+  per machine, and it must exist before the deploy
+  (`flk volumes create data --size N`; `flk help deploy`). A new volume is
+  an empty filesystem whose root is owned by root, unless it's created with
+  `--owner UID[:GID]` (or filled with `--from-dir DIR`). If the app runs as
+  uid 1000, the next step should say `--owner 1000:1000`, and the image
+  should also create the mount point owned by that user
+  (`install -d -o ubuntu -g ubuntu /data`, valheim.flk BUGS #4) for
+  volumes made without it. A volume mounted over a directory hides
+  whatever the image put there (mounting one over `/home` hides the
+  image's home directories), so anything the program needs there has to
+  be seeded at first boot.
+- **No sharing host folders**: Firecracker has no virtiofs or 9p, so a VM
+  can't mount a directory from the host. Data goes in through a volume
+  (`flk volumes create --from-dir`, `flk files cp`), the network, or the
+  image.
 - **Ports**: `[[services]] internal_port` + `protocol` (tcp/udp) +
   `[[services.ports]] port` forwards a host port. Host ports below 1024
   are refused, and so are ports a host process already uses. Forwarding

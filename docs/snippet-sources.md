@@ -53,10 +53,12 @@ if it's cheap to find out.
 
 | Snippet | What | Learned from |
 |---|---|---|
-| `user-1000` | run as uid 1000 (use the base's user or create `app`), HOME, WORKDIR | all game Dockerfiles |
+| `user-1000` | run as uid 1000 (use the base's user or create `app`), HOME, WORKDIR; on busybox bases also add `setpriv` (or init runs the app as root) | all game Dockerfiles, `~/flk/share/init.sh` |
 | `user-rename` | rename the uid-1000 user, optional passwordless sudo (sandboxes only, with a hint saying so) | opencode.flk |
 | `volume` | `[[mounts]]` + mount point owned by the app user + the `flk volumes create` next step | valheim.flk BUGS #4, all apps |
 | `volume-links` | symlinks from the program's folder to the volume | ncm.flk |
+| `home-volume` | home directories on a volume, seeded from the image (`/etc/skel` or a copy) at first boot, because the mount hides what the image put there | (new; from the genma notes) |
+| `sshd` | for real SSH clients only (`flk ssh console` covers shells): sshd in the foreground (no systemd), host keys made at first boot on the volume, the public key from the build context or a secret, never a private key | (new; from the genma notes) |
 | `site-env` | host-specific settings kept out of git (`site.env.example`) | valheim.flk |
 
 ## Network and health (`network`, `check`)
@@ -96,7 +98,7 @@ step; never a value), `kill-timeout`.
 | `daemon` | base-alpine, packages, entrypoint-clear, restart-always, backup-pause | mqtt.flk |
 | `web-service` | base-alpine, http-service, check-http, volume | flk examples/hello |
 | `python-workbench` | base-python, git-pinned, pip, volume-links | ncm.flk |
-| `dev-sandbox` | base-ubuntu, user-rename, idle-cmd, rootfs-extra | opencode.flk |
+| `dev-sandbox` | base-ubuntu, user-rename, idle-cmd, rootfs-extra; options: `home-volume`, `sshd`. Tools from system packages or pinned downloads, not `curl \| bash` into `~`, so `flk deploy` upgrades them and a home volume doesn't hide them | opencode.flk |
 | `blank` | a base only | |
 
 The "Check it reproduces" column is the acceptance test (PLAN M1): a

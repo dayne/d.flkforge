@@ -245,6 +245,16 @@ real apps' history:
 - A wrapper with its own restart loop goes with `[[restart]] retries = 1`.
 - No secret value ever lands in a written file.
 - Short image names fail on podman without search registries.
+- The base must have `/bin/sh` (flk's init is a shell script).
+- A non-root user on a base without `setpriv` or `chroot --userspec`
+  (busybox/Alpine) silently runs as root: add the package.
+- Nothing in the image may expect systemd, or manage the network,
+  hostname, `/etc/hosts` or `/etc/resolv.conf` (init writes them).
+- A volume mounted over a path the image fills (e.g. `/home`, or a
+  `curl | bash` installer that writes to `~`) hides that content: install
+  system-wide, or seed the volume at first boot.
+- No private key ever goes into the build context (public keys only), and
+  tokens are secrets, not `[env]`.
 
 ### 6.5 Drift and re-rendering
 
@@ -292,7 +302,10 @@ Steps (each one skippable when its template already decided it):
 1. **Start**: a template, or open a hub recipe later. One line on what
    each template is for.
 2. **Name**: the app name, checked against flk's rules and the registered
-   apps. Suggest a `flkt-` prefix for experiments.
+   apps. Suggest a `flkt-` prefix for experiments. The default comes from
+   the directory, following the house convention: `foo.flk` becomes
+   `foo-flk` (app names can't contain dots). The machine names are flk's
+   to generate; don't ask for them.
 3. **Base**: the runtime image (Ubuntu, Debian, Alpine, Java/Temurin,
    .NET, Python, steamcmd+Wine, or a custom image with its family and
    user). Hint: full names, image size, what's already in it.
@@ -306,7 +319,12 @@ Steps (each one skippable when its template already decided it):
    why the wrapper loop goes with `retries = 1`.
 6. **User and data**: which user runs it, volumes and their mount points,
    and what lives in the image versus on the volume (the most important
-   decision; explain it).
+   decision; explain it). Ask it directly: *what must survive a deploy?*
+   The root filesystem is rebuilt every time. For a server, that's the
+   world and its config. For a dev box, it's home directories, tool logins
+   (such as `~/.claude`) and sshd host keys. Host keys generated in the
+   image's filesystem change on every deploy ("host key changed"), so they
+   belong on the volume, created at first boot.
 7. **Network**: services (tcp/udp ports), http_service, `bind`. Hints:
    below 1024, 127.0.0.1, machine IPs.
 8. **Health**: log, tcp and http checks with grace periods. Suggest a log
@@ -318,8 +336,43 @@ Steps (each one skippable when its template already decided it):
     are never stored; the next steps list `flk secrets set NAME=... --stage`).
 12. **Review**: the full files, the rule results, `flk config show`'s
     verdict, then write.
-13. **Next**: the exact flk commands, in order, ready to copy. flkforge
-    doesn't run them.
+13. **Report and next steps**: four short parts, the same in the wizard
+    and in `new`/`render` output (and in `--json`):
+    - **Written**: the files, and the snippets behind each one.
+    - **Not in effect yet**: what the files ask for but won't happen
+      until something else does, and why (a volume not created yet, a
+      secret not set, a host port below 1024, a host-wide `bind`).
+    - **For you to run**: the flk commands in order, ready to copy, then
+      any root steps on their own, marked as root and never run by
+      flkforge.
+    - **Gaps in flk**: anything asked for that flk can't do yet, with
+      the nearest workaround, and an entry for `BUGS.flk.md` if it's new.
+
+### 8.1 Asks that aren't snippets
+
+Some requests can't be met by image or config at all. flkforge says so
+before it generates anything, rather than writing files that look right
+and do nothing. Each one falls in one of four groups:
+**flk supports it** (a snippet), **root on the host**, **needs a flk
+change**, or **not possible on Firecracker**. Keep a small catalog of
+these (`snippets/core/_limits.toml`, shown by `flkforge explain`), each
+with its group, why, and the nearest alternative. Starting entries:
+
+- Share a host folder: not possible (no virtiofs/9p). Alternatives:
+  `flk volumes create --from-dir`, `flk files cp`, or sshfs over the
+  network.
+- A LAN address of its own, DHCP, a fixed MAC: needs a flk change (M5
+  "managed extra addresses" in `~/flk/PLAN.md`) and host networking.
+  Today: forwarded host ports, `[flk] bind` to a second host address.
+- GPU: not possible (no passthrough; see `~/ncm.flk`).
+- Host ports below 1024: root on the host (`FLK_MIN_PORT` in flk's
+  `setup-host.sh`).
+- A shell in the VM: flk already does it (`flk ssh console`,
+  `flk exec`). sshd is a snippet only for real SSH clients.
+
+Before adding an entry, check `flk help --all` and `~/flk/PLAN.md`,
+because flk changes. The `version` and `schema` from
+`flk help --all --json` say which flk the entry was checked against.
 
 Keys follow lazyflk where they overlap (`?` help, `q`/`esc`, tab). `h`
 cycles the hint detail level (summary → under the hood → off), and
@@ -375,3 +428,7 @@ recipe's `[[vm]]` gives; fly.io deployment.
 ## 12. Changes
 
 - 2026-11-04: first draft (design session in `~/flk`, before any code).
+- 2026-11-04: from a review of another agent's notes on a dev-box request
+  ("genma"), checked against flk: guest rules in 6.4, the persistence
+  question in step 6, the four-part report in step 13, asks that aren't
+  snippets (8.1), and default names from the directory.

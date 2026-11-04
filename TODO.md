@@ -29,6 +29,13 @@ depends on them; ask the user when it's their call.
 
 ## Ideas
 
+- Smoke checks: snippets declare `[[smoke]]` commands (the volume is
+  mounted, the tool runs, the app runs as the expected user), and
+  `flkforge verify -a APP` runs them over `flk exec`. That's read-only, so
+  it's safe on real apps too, and it covers what flk's deploy checks don't
+  (they only see ports and log lines). It also confirms which env vars a
+  guest really sees. Make it part of PLAN M4 if it's cheap.
+
 - `flkforge explain KEY` for any flk.toml key, built from flk's reference
   plus the snippets that set the key.
 - Import an existing app into a recipe (PLAN, Later).

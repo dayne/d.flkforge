@@ -1,0 +1,80 @@
+# A reference recipe for valheim-flk (~/valheim.flk), PLAN M1. Not a
+# migration: the real app stays hand-written. What flk reads from the
+# rendered flk.toml is compared with what it reads from the real one
+# (TestReferenceApps); the differences are in valheim.notes.md.
+flkforge = "0.1.0"
+app = "valheim-flk"
+
+[[use]]
+  snippet = "core/base-ubuntu"
+  params = { version = "24.04" }
+
+[[use]]
+  snippet = "core/packages"
+  params = { list = ["ca-certificates", "curl", "tzdata", "libatomic1", "libpulse0", "libstdc++6"] }
+
+[[use]]
+  snippet = "core/steamcmd"
+  params = { app_id = 896660, build_id = "25909431", check_file = "valheim_server.x86_64" }
+
+[[use]]
+  snippet = "core/run-wrapper"
+  [use.params]
+    command = ["bash", "-c", "export LD_LIBRARY_PATH=/server/linux64 SteamAppId=892970; exec ./valheim_server.x86_64 -nographics -batchmode -name \"$VH_NAME\" -port \"$VH_PORT\" -world \"$VH_WORLD\" -savedir /data -public \"$VH_PUBLIC\" -saveinterval \"$VH_SAVEINTERVAL\" -backups \"$VH_BACKUPS\""]
+    stop = "signal:INT"
+    stop_timeout = 90
+    ready = "Game server connected"
+    filter = "^\\(Filename: "
+    hooks = ["prestart", "watch"]
+
+[[use]]
+  snippet = "core/user-1000"
+  params = { workdir = "/server" }
+
+[[use]]
+  snippet = "core/env"
+  id = "tz"
+  params = { vars = { TZ = "America/Anchorage" } }
+
+[[use]]
+  snippet = "core/env"
+  id = "vh"
+  [use.params]
+    comment = "the Valheim server (vh-run's settings)"
+    vars = { VH_NAME = "flk test", VH_WORLD = "flktest", VH_PORT = "2456", VH_PUBLIC = "1", VH_CROSSPLAY = "0", VH_SAVEINTERVAL = "1800", VH_BACKUPS = "2", VH_PRESET = "", VH_MODIFIERS = "", VH_SETKEYS = "", VH_ADMINS = "", VH_PERMITTED = "", VH_BANNED = "" }
+
+[[use]]
+  snippet = "core/volume"
+  params = { name = "vhdata", path = "/data", holds = "-savedir: worlds_local/, adminlist.txt, Valheim's own backups" }
+
+[[use]]
+  snippet = "core/check-log"
+  params = { match = "Game server connected", grace = "5m" }
+
+[[use]]
+  snippet = "core/backup-pause"
+  params = { verify = "bin/vh-verify-backup" }
+
+[[use]]
+  snippet = "core/before-deploy"
+  params = { keep_releases = 3 }
+
+[[use]]
+  snippet = "core/restart-outer-net"
+
+[[use]]
+  snippet = "core/stdin-null"
+
+[[use]]
+  snippet = "core/vm"
+  params = { cpus = 4, memory = "6gb" }
+
+[[use]]
+  snippet = "core/service"
+  id = "game"
+  params = { port = 2456, protocol = "udp", comment = "Game" }
+
+[[use]]
+  snippet = "core/service"
+  id = "query"
+  params = { port = 2457, protocol = "udp", comment = "Steam query (the server list)" }

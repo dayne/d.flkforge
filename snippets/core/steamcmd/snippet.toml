@@ -1,0 +1,104 @@
+id = "core/steamcmd"
+version = "0.1.0"
+title = "Steam dedicated server (steamcmd)"
+category = "fetch"
+summary = "Download a Steam server at build time in its own stage, pinned to a build id."
+requires = ["category:base"]
+suggests = ["core/run-wrapper", "core/before-deploy"]
+tags = ["game", "steam"]
+source = "~/valheim.flk/Dockerfile (two stages), ~/enshrouded.flk/Dockerfile (windows)"
+
+[params.app_id]
+type = "int"
+required = true
+min = 1
+prompt = "Steam app id of the dedicated server"
+hint = "The server's own app id, not the game's: Valheim's is 896660. Search steamdb.info for 'dedicated server'."
+
+[params.build_id]
+type = "string"
+default = "latest"
+prompt = "The Steam build to pin (or latest)"
+hint = "Steam serves only its current build: a pin that Steam has moved past fails the build on purpose, and the old build exists only in flk's kept release images."
+validate = '^(latest|[0-9]+)$'
+
+[params.platform]
+type = "enum"
+values = ["linux", "windows"]
+default = "linux"
+prompt = "Server platform"
+hint = "windows servers run under Wine: they need a Wine base (core/base-wine, later)."
+
+[params.dir]
+type = "string"
+default = "/server"
+prompt = "Where the server goes in the image"
+validate = '^/[A-Za-z0-9._/-]+$'
+
+[params.check_file]
+type = "string"
+prompt = "A file the download must contain (relative to dir), to catch a broken download"
+validate = '^[A-Za-z0-9._/-]+$'
+
+[[dockerfile]]
+slot = "header"
+text = """
+# The server is Steam app {{.P.app_id}}, downloaded by steamcmd in its own stage
+# and pinned by STEAM_BUILDID ([build] args in flk.toml). Steam serves only
+# its current build, so the build fails once Steam has moved past the pin;
+# old builds come back only from kept release images (flk releases rollback)."""
+
+[[dockerfile]]
+stage = "steam"
+text = '''
+# --- download the server with steamcmd -----------------------------------------
+FROM docker.io/steamcmd/steamcmd:ubuntu-24 AS steam
+ARG STEAM_BUILDID=latest
+RUN for try in 1 2 3; do \
+      steamcmd {{if eq .P.platform "windows"}}+@sSteamCmdForcePlatformType windows {{end}}+force_install_dir {{.P.dir}} +login anonymous +app_update {{.P.app_id}} validate +quit && break; \
+      echo "steamcmd failed (try $try)"; sleep 5; \
+    done \
+{{- if .P.check_file}}
+ && test -e {{.P.dir}}/{{.P.check_file}} \
+{{- end}}
+ && got=$(sed -n 's/^[[:space:]]*"buildid"[[:space:]]*"\([0-9]*\)".*/\1/p' {{.P.dir}}/steamapps/appmanifest_{{.P.app_id}}.acf | head -1) \
+ && echo "$got" > {{.P.dir}}/BUILDID \
+ && echo "Steam build $got (pinned: $STEAM_BUILDID)" \
+ && if [ "$STEAM_BUILDID" != latest ] && [ "$STEAM_BUILDID" != "$got" ]; then \
+      echo "ERROR: Steam served build $got but flk.toml pins $STEAM_BUILDID: set the new build id" >&2; exit 1; \
+    fi \
+ && rm -rf {{.P.dir}}/steamapps/downloading {{.P.dir}}/steamapps/temp'''
+
+[[dockerfile]]
+slot = "fetch"
+text = "COPY --from=steam {{.P.dir}} {{.P.dir}}"
+
+[[flktoml]]
+text = '''
+[build]
+  # The Steam build this release runs. Bump it to upgrade.
+  args = { STEAM_BUILDID = {{toml .P.build_id}} }
+'''
+
+[[next]]
+kind = "pending"
+when = '{{eq .P.build_id "latest"}}'
+text = "The Steam build isn't pinned (build_id = latest)"
+why = "every deploy downloads whatever Steam has; look the current build up on api.steamcmd.net/v1/info/{{.P.app_id}} and set build_id"
+
+[hints]
+what = "Downloads the server with steamcmd in a build stage and copies it into the image, pinned to a Steam build."
+under_the_hood = """
+flk deploy runs podman build: the steam stage runs steamcmd anonymously
+(three tries), records the build it got in BUILDID, and fails if that
+isn't the pinned STEAM_BUILDID. Only the server directory is copied into
+the runtime image, so steamcmd itself isn't in it. The same pin reuses the
+cached layer; a new pin downloads again. Every release is one exact Steam
+build, so flk releases rollback is how an older one comes back.
+"""
+gotchas = [
+  "Steam drops old builds: keep_releases (core/before-deploy) is the only way back.",
+  "The download needs disk: a few GB for the build cache and the image.",
+  "Some servers need extra runtime libraries in the final image (Valheim: libatomic1, libpulse0).",
+]
+docs = ["flk help --all  (Config: [build] args)", "flk help releases"]

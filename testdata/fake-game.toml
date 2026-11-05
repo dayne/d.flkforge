@@ -1,0 +1,112 @@
+# PLAN M1's deploy test: a supervised server (testdata/fakeserver) under
+# flk-run, with a volume, a log check, pause backups and the outer restart
+# net. flkforge new DIR --recipe testdata/fake-game.toml --yes --app flkt-forge-run
+flkforge = "0.1.0"
+app = "fake-game"
+
+[[use]]
+  snippet = "core/base-ubuntu"
+
+[[use]]
+  snippet = "core/start-script"
+  [use.params]
+    file = "fakeserver"
+    dest = "/usr/local/bin/fakeserver"
+    cmd = false
+    body = '''
+#!/usr/bin/env bash
+# fakeserver: a stand-in game server for flk-run's tests and PLAN M1's
+# deploy test. It behaves like the real ones in the ways flk-run cares
+# about: a ready line, a save on a clean stop, a console, and crashes or
+# hangs on request.
+#
+#   FAKE_DATA         where it saves (default /data)
+#   FAKE_READY_AFTER  seconds before "fake: Server ready" (default 1)
+#   FAKE_CRASH_AFTER  exit 3 after this many seconds (default 0: never)
+#   FAKE_STOP         how it stops cleanly: console (a "stop" line), INT or TERM
+#   FAKE_HANG         1: ignore every stop request (flk-run must escalate)
+#
+# Console lines: stop, save, say TEXT. Every start adds one to
+# FAKE_DATA/starts; every save writes FAKE_DATA/world.txt.
+set -u
+FAKE_DATA=${FAKE_DATA:-/data}
+FAKE_READY_AFTER=${FAKE_READY_AFTER:-1}
+FAKE_CRASH_AFTER=${FAKE_CRASH_AFTER:-0}
+FAKE_STOP=${FAKE_STOP:-console}
+FAKE_HANG=${FAKE_HANG:-0}
+
+starts=$(($(cat "$FAKE_DATA/starts" 2>/dev/null || echo 0) + 1))
+echo "$starts" >"$FAKE_DATA/starts"
+
+save() {
+  echo "saved at $(date -u +%FT%TZ), start $starts" >"$FAKE_DATA/world.txt.new" &&
+    mv "$FAKE_DATA/world.txt.new" "$FAKE_DATA/world.txt"
+  echo "fake: Saved the world"
+}
+
+stop() {
+  if ((FAKE_HANG)); then
+    echo "fake: ignoring the stop ($1)"
+    return
+  fi
+  echo "fake: stopping ($1)"
+  save
+  exit 0
+}
+
+trap 'if [[ $FAKE_STOP == INT ]]; then stop SIGINT; else echo "fake: SIGINT ignored"; fi' INT
+trap 'if [[ $FAKE_STOP == TERM ]]; then stop SIGTERM; else echo "fake: killed by SIGTERM, no save"; exit 143; fi' TERM
+
+echo "fake: starting (start $starts, pid $$)"
+sleep "$FAKE_READY_AFTER"
+echo "fake: Server ready"
+start=$SECONDS
+while true; do
+  if ((FAKE_CRASH_AFTER > 0 && SECONDS - start >= FAKE_CRASH_AFTER)); then
+    echo "fake: crashing"
+    exit 3
+  fi
+  if IFS= read -r -t 0.2 line; then
+    case $line in
+      stop) [[ $FAKE_STOP == console ]] && stop console || echo "fake: stop line ignored" ;;
+      save) save ;;
+      "say "*) echo "fake: ${line#say }" ;;
+      *) echo "fake: unknown command: $line" ;;
+    esac
+  elif (($? <= 128)); then
+    sleep 0.2   # stdin is at EOF (/dev/null)
+  fi
+done
+'''
+
+[[use]]
+  snippet = "core/run-wrapper"
+  params = { command = ["/usr/local/bin/fakeserver"], stop = "console:stop", stop_timeout = 20, ready = "^fake: Server ready", restart_delay = 5, hooks = ["prestart"] }
+
+[[use]]
+  snippet = "core/user-1000"
+
+[[use]]
+  snippet = "core/env"
+  params = { comment = "the fake server", vars = { FAKE_STOP = "console", FAKE_READY_AFTER = "3" } }
+
+[[use]]
+  snippet = "core/volume"
+  params = { name = "world", path = "/data", holds = "the fake world (world.txt) and its start count" }
+
+[[use]]
+  snippet = "core/check-log"
+  params = { match = "^fake: Server ready", grace = "60s" }
+
+[[use]]
+  snippet = "core/backup-pause"
+
+[[use]]
+  snippet = "core/before-deploy"
+
+[[use]]
+  snippet = "core/restart-outer-net"
+
+[[use]]
+  snippet = "core/vm"
+  params = { cpus = 1, memory = "256mb" }

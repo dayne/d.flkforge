@@ -42,6 +42,8 @@ type Step struct {
 	Why   string `json:"why,omitempty"`
 	From  string `json:"from,omitempty"` // the use that asked for it
 	Order int    `json:"-"`
+	// UntilEdited: drop the step once this seed file differs from the stub.
+	UntilEdited string `json:"-"`
 }
 
 // Finding is a rule's result (SPEC 6.4).
@@ -139,6 +141,20 @@ func Render(r *recipe.Recipe, cat Resolver) (*Result, error) {
 		return nil, err
 	}
 	app.Image = strings.TrimSpace(img)
+	var userFrom string
+	for _, u := range uses {
+		if u.s.User == "" {
+			continue
+		}
+		if userFrom != "" {
+			return nil, fmt.Errorf("%s and %s both set the app's user: use one", userFrom, u.key)
+		}
+		name, err := execute(u.s.ID+" user", u.s.User, Data{P: u.p, ID: u.key, App: app})
+		if err != nil {
+			return nil, err
+		}
+		app.User, userFrom = strings.TrimSpace(name), u.key
+	}
 
 	res := &Result{}
 	dockerfile, from, err := renderDockerfile(uses, base, app)
@@ -327,7 +343,7 @@ func renderDockerfile(uses []*use, base *use, app App) (string, []string, error)
 	var b strings.Builder
 	b.WriteString(header(app.Name) + "\n")
 	if h := slots["header"]; len(h) > 0 {
-		b.WriteString("#\n" + strings.Join(h, "\n") + "\n")
+		b.WriteString("#\n" + strings.Join(h, "\n#\n") + "\n")
 	}
 	for _, st := range stageOrder {
 		b.WriteString("\n" + strings.Join(stages[st], "\n") + "\n")
@@ -443,7 +459,11 @@ func steps(uses []*use, app App) ([]Step, error) {
 			if order == 0 {
 				order = 50
 			}
-			st := Step{Kind: kind, Text: strings.TrimSpace(text), Why: strings.TrimSpace(why), From: u.key, Order: order}
+			until, err := execute(u.s.ID+" next until_edited", n.UntilEdited, d)
+			if err != nil {
+				return nil, err
+			}
+			st := Step{Kind: kind, Text: strings.TrimSpace(text), Why: strings.TrimSpace(why), From: u.key, Order: order, UntilEdited: strings.TrimSpace(until)}
 			if !slices.ContainsFunc(out, func(o Step) bool { return o.Kind == st.Kind && o.Text == st.Text }) {
 				out = append(out, st)
 			}
@@ -518,10 +538,30 @@ var funcs = template.FuncMap{
 		return v
 	},
 	"trim": strings.TrimSpace,
+	"add": func(a, b any) (int64, error) {
+		x, ok1 := toInt(a)
+		y, ok2 := toInt(b)
+		if !ok1 || !ok2 {
+			return 0, fmt.Errorf("add: want numbers, got %v and %v", a, b)
+		}
+		return x + y, nil
+	},
+	// fail stops the render with a message (a snippet's own check)
+	"fail": func(msg string) (string, error) { return "", fmt.Errorf("%s", msg) },
 	// key writes a TOML key, quoted if it needs to be
 	"key": flktoml.FormatKey,
 	"indent": func(n int, s string) string {
 		pad := strings.Repeat(" ", n)
 		return pad + strings.ReplaceAll(s, "\n", "\n"+pad)
 	},
+}
+
+func toInt(v any) (int64, bool) {
+	switch n := v.(type) {
+	case int64:
+		return n, true
+	case int:
+		return int64(n), true
+	}
+	return 0, false
 }

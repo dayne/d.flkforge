@@ -1,0 +1,48 @@
+id = "core/check-log"
+version = "0.1.0"
+title = "Log health check"
+category = "check"
+summary = "A deploy waits for a line in the console log (the server's ready line); one that never comes rolls back."
+multi = true
+source = "all the game flk.tomls, ~/mqtt.flk/flk.toml"
+
+[params.name]
+type = "string"
+default = "ready"
+prompt = "Check name ([checks.NAME])"
+validate = '^[a-z0-9_-]+$'
+
+[params.match]
+type = "regex"
+required = true
+prompt = "A regex for the line that means the app is ready"
+hint = "The same line as core/run-wrapper's ready, typically. A Ruby regex, matched against the console since boot: ^ works, but don't end it with $ (console lines end in \\r\\r; BUGS.flk.md #2)."
+
+[params.grace]
+type = "duration"
+default = "60s"
+prompt = "How long it may take after boot"
+hint = "Cover the slowest start: a first boot that generates a world can take minutes."
+
+[[flktoml]]
+text = '''
+# A deploy waits for this line on the console; a machine that doesn't log
+# it within grace_period goes back to its previous release.
+[checks.{{.P.name}}]
+  type = "log"
+  match = {{toml .P.match}}
+  grace_period = {{toml .P.grace}}
+'''
+
+[hints]
+what = "Adds a log check: deploys wait for the app's ready line."
+under_the_hood = """
+flk's own check type: after booting a machine, deploy reads its console
+log (since boot) for a line matching the regex, for up to grace_period.
+It's the check for UDP-only servers, which have no TCP port to probe.
+"""
+gotchas = [
+  "A regex that also matches chat or an error message passes too early: anchor the start (^) on the line's exact shape.",
+  "Don't end it with $: the console's lines end in \\r\\r, so flk 0.1.0 never matches it (BUGS.flk.md #2).",
+]
+docs = ["flk help --all  (Config: [checks.NAME])", "flk help deploy"]

@@ -1,0 +1,55 @@
+id = "core/user-1000"
+version = "0.1.0"
+title = "Run as uid 1000"
+category = "user"
+summary = "Run the app as an ordinary user (uid 1000), not root: the base's own user, or a new one."
+requires = ["category:base"]
+source = "all the game Dockerfiles; ~/flk/share/init.sh (how init switches users)"
+user = '{{if .P.name}}{{.P.name}}{{else if .App.BaseUser}}{{.App.BaseUser}}{{else}}app{{end}}'
+packages = '{{if eq .App.Family "apk"}}setpriv{{end}}'
+
+[params.name]
+type = "string"
+prompt = "User name (default: the base image's uid-1000 user, or app)"
+validate = '^[a-z_][a-z0-9_-]*$'
+
+[params.workdir]
+type = "string"
+prompt = "Working directory (default: the user's home)"
+validate = '^/'
+
+[[dockerfile]]
+slot = "install"
+when = '{{if not .App.BaseUser}}true{{end}}'
+text = '''
+# uid/gid 1000 runs the app.
+{{if eq .App.Family "apk"}}RUN adduser -D -u 1000 {{.App.User}}{{else}}RUN useradd -m -u 1000 -s /bin/bash {{.App.User}}{{end}}'''
+
+[[dockerfile]]
+slot = "install"
+when = '{{if and .App.BaseUser .P.name}}{{if ne .P.name .App.BaseUser}}true{{end}}{{end}}'
+text = '''{{fail (print "the base already has uid 1000 as " .App.BaseUser ": leave name empty to use it (renaming is core/user-rename, later)")}}'''
+
+[[dockerfile]]
+slot = "user"
+text = '''
+ENV HOME=/home/{{.App.User}}
+USER {{.App.User}}
+WORKDIR {{if .P.workdir}}{{.P.workdir}}{{else}}/home/{{.App.User}}{{end}}'''
+
+[hints]
+what = "Makes the app run as uid 1000 instead of root, with its home and working directory."
+under_the_hood = """
+The Dockerfile's USER is recorded in the image; flk's init (PID 1) runs as
+root, mounts the volumes, then starts the app as that user with setpriv
+(util-linux) or chroot --userspec. On busybox images (Alpine) neither
+exists, so this snippet adds setpriv there: without it init only logs a
+warning and runs the app as root. Volumes mounted into the app take the
+owner of their mount point in the image on first use (core/volume creates
+it owned by this user).
+"""
+gotchas = [
+  "Files the image puts in place as root stay root's: chown what the app must write, or put it on a volume.",
+  "Ubuntu-based images (ubuntu, eclipse-temurin, dotnet) already have uid 1000 as ubuntu.",
+]
+docs = ["flk help --all  (Machines: non-root USER)", "~/flk/share/init.sh"]

@@ -1,0 +1,326 @@
+#!/usr/bin/env bash
+# flk-run v1: runs a server as the main process of a flk VM.
+#
+# Written by flkforge (core/run-wrapper) and copied as is into every app
+# that uses it; fix it in the snippet, not here (flkforge render puts the
+# fixed one back). What it does, the same way mc-run, vs-run, vh-run and
+# en-run did:
+#
+# - Graceful stop: flk's SIGTERM becomes the server's own stop, a console
+#   line (RUN_STOP=console:stop) or a signal (RUN_STOP=signal:INT). If the
+#   server is still running after STOP_TIMEOUT seconds, RUN_ESCALATE (TERM
+#   or KILL) and then RUN_ESCALATE_CMD. Keep STOP_TIMEOUT below flk.toml's
+#   kill_timeout, or flk kills the VM before the server has saved.
+# - Restarts: a server that exits on its own is started again after
+#   RESTART_DELAY seconds. MAX_RESTARTS restarts within RESTART_WINDOW
+#   seconds means something is really wrong: give up (exit 1), and the VM
+#   powers off. flk's own [[restart]] is then the outer net (retries = 1).
+# - Ready: the first output line matching RUN_READY (an extended regex) is
+#   reported as server.online.
+# - Events: with RUN_EVENTS=1 (the default), gamebus event lines,
+#   `[gamebus] {"v":1,"type":...}` (~/m.gamebus/SPEC.md): server.starting,
+#   server.online, server.stopping, server.stopped, server.restarting,
+#   server.gave_up. Without a gamebus hub they're just log lines.
+# - Quieter log: output lines matching RUN_FILTER are dropped.
+#
+# What's specific to the app goes in hooks, in RUN_HOOKS
+# (/usr/local/lib/flk-run), each optional and the admin's own:
+#   prestart   run before every start; a failure stops flk-run (exit 1).
+#              Checks, and config files written from the environment.
+#   watch      sourced (bash) by the output reader. It may define
+#              on_line LINE (each output line, after filtering) and
+#              on_tick (every RUN_TICK seconds), and use event, console
+#              and log.
+#   poststop   run after every exit of the server, with its status as $1
+#              and RUN_STOPPING=1 when flk asked it to stop.
+#
+# Usage: flk-run [--exec] -- COMMAND [ARGS...]
+#   --exec   run prestart, then exec COMMAND (no supervision: a daemon
+#            that handles SIGTERM itself).
+#
+# Settings (flk.toml [env]): RUN_NAME RUN_STOP RUN_ESCALATE RUN_ESCALATE_CMD
+# RUN_READY RUN_FILTER RUN_EVENTS RUN_CONSOLE RUN_TICK RUN_HOOKS
+# STOP_TIMEOUT RESTART_DELAY MAX_RESTARTS RESTART_WINDOW.
+set -uo pipefail
+
+RUN_NAME=${RUN_NAME:-${FLK_APP_NAME:-app}}
+RUN_STOP=${RUN_STOP:-signal:TERM}
+RUN_ESCALATE=${RUN_ESCALATE:-}
+RUN_ESCALATE_CMD=${RUN_ESCALATE_CMD:-}
+RUN_READY=${RUN_READY:-}
+RUN_FILTER=${RUN_FILTER:-}
+RUN_EVENTS=${RUN_EVENTS:-1}
+RUN_CONSOLE=${RUN_CONSOLE:-0}
+RUN_TICK=${RUN_TICK:-60}
+RUN_HOOKS=${RUN_HOOKS:-/usr/local/lib/flk-run}
+STOP_TIMEOUT=${STOP_TIMEOUT:-90}
+RESTART_DELAY=${RESTART_DELAY:-10}
+MAX_RESTARTS=${MAX_RESTARTS:-5}
+RESTART_WINDOW=${RESTART_WINDOW:-600}
+
+log() { echo "[$RUN_NAME] $*"; }
+die() { log "FATAL: $*"; exit 1; }
+
+# From ~/m.gamebus/adapters/gamebus-event.sh (copy; keep in step):
+# gamebus-event.sh v1
+gamebus_event() {
+  local type=$1 msg=${2-} kv k v json
+  _gb_str() {
+    local s=$1
+    s=${s//\\/\\\\} s=${s//\"/\\\"}
+    s=${s//$'\n'/\\n} s=${s//$'\r'/\\r} s=${s//$'\t'/\\t}
+    printf '"%s"' "$s"
+  }
+  json="{\"v\":1,\"type\":$(_gb_str "$type")"
+  [[ -n $msg ]] && json+=",\"msg\":$(_gb_str "$msg")"
+  shift $(($# < 2 ? $# : 2))
+  for kv in "$@"; do
+    k=${kv%%=*} v=${kv#*=}
+    if [[ $k == *: ]]; then
+      k=${k%:}
+      [[ $v =~ ^-?(0|[1-9][0-9]{0,14})$ ]] || continue
+    else
+      v=$(_gb_str "$v")
+    fi
+    [[ $k =~ ^[a-z_][a-z0-9_]*$ ]] && json+=",\"$k\":$v"
+  done
+  printf '[gamebus] %s}\n' "$json"
+}
+
+# event TYPE MESSAGE [KEY=VALUE...]: a gamebus event line (RUN_EVENTS=1)
+event() { [[ $RUN_EVENTS == 1 ]] && gamebus_event "$@"; return 0; }
+
+# console TEXT: type a line into the server's console (needs a console:
+# RUN_STOP=console:... or RUN_CONSOLE=1)
+console() {
+  if [[ -n ${FIFO:-} ]]; then echo "$*" >&3; else log "console: no console (set RUN_CONSOLE=1)"; fi
+}
+
+# --- arguments and settings ------------------------------------------------------
+
+exec_mode=0
+while (($#)); do
+  case $1 in
+    --exec) exec_mode=1; shift ;;
+    --) shift; break ;;
+    *) die "usage: flk-run [--exec] -- COMMAND [ARGS...] (got '$1')" ;;
+  esac
+done
+(($#)) || die "usage: flk-run [--exec] -- COMMAND [ARGS...]"
+
+case $RUN_STOP in
+  console:?*) stop_kind=console stop_arg=${RUN_STOP#console:} ;;
+  signal:?*) stop_kind=signal stop_arg=${RUN_STOP#signal:} ;;
+  *) die "RUN_STOP must be console:LINE or signal:NAME (got '$RUN_STOP')" ;;
+esac
+if [[ -z $RUN_ESCALATE ]]; then
+  if [[ $stop_kind == signal && $stop_arg == TERM ]]; then RUN_ESCALATE=KILL; else RUN_ESCALATE=TERM; fi
+fi
+for n in STOP_TIMEOUT RESTART_DELAY MAX_RESTARTS RESTART_WINDOW RUN_TICK; do
+  [[ ${!n} =~ ^[0-9]+$ ]] || die "$n must be a whole number of seconds (got '${!n}')"
+done
+
+stopping=0
+stop_sent=0
+server_pid=0
+delay_pid=0
+timer_pid=0
+watch_pid=0
+cat_pid=0
+FIFO=
+OUT_FIFO=
+
+# prestart: the hook, if there is one
+prestart() {
+  [[ -x $RUN_HOOKS/prestart ]] || return 0
+  "$RUN_HOOKS/prestart" || { log "prestart failed (status $?)"; return 1; }
+}
+
+if ((exec_mode)); then
+  prestart || exit 1
+  exec "$@"
+fi
+
+# --- the console and the output reader -------------------------------------------
+
+if [[ $stop_kind == console || $RUN_CONSOLE == 1 ]]; then
+  # The server reads commands from this FIFO. We hold it open read-write on
+  # fd 3 so it never sees EOF, and so the stop line can be written to it.
+  FIFO=$(mktemp -u "/tmp/$RUN_NAME-console.XXXXXX")
+  mkfifo -m 600 "$FIFO"
+  exec 3<>"$FIFO"
+  # Typed input (flk console), if any, goes to the server's console too.
+  # Background jobs get /dev/null as stdin unless it's redirected, so
+  # hand cat our stdin through fd 4.
+  if [[ $(readlink /proc/self/fd/0 2>/dev/null) != /dev/null ]]; then
+    exec 4<&0
+    cat <&4 >&3 4<&- &
+    cat_pid=$!
+  fi
+fi
+
+# Server output goes through a FIFO to the reader. (Not >(...): flk VMs have
+# no /dev/fd, which bash process substitution needs.)
+OUT_FIFO=$(mktemp -u "/tmp/$RUN_NAME-output.XXXXXX")
+mkfifo -m 600 "$OUT_FIFO"
+
+# reader: copies server output to our stdout, drops RUN_FILTER lines, reports
+# the ready line, and calls the watch hook.
+reader() {
+  trap - TERM INT
+  local line part='' rc online=0 t next_tick
+  if [[ -f $RUN_HOOKS/watch ]]; then
+    # shellcheck source=/dev/null
+    source "$RUN_HOOKS/watch" || log "WARNING: the watch hook failed to load"
+  fi
+  local ticking=0
+  declare -F on_tick >/dev/null && ticking=1
+  next_tick=$((SECONDS + RUN_TICK))
+  while true; do
+    if ((ticking)); then
+      t=$((next_tick - SECONDS))
+      if ((t <= 0)); then
+        on_tick
+        next_tick=$((SECONDS + RUN_TICK))
+        t=$RUN_TICK
+      fi
+      IFS= read -r -t "$t" line
+    else
+      IFS= read -r line
+    fi
+    rc=$?
+    if ((rc > 128)); then part+=$line; continue; fi   # a timeout keeps the partial line
+    ((rc == 0)) || [[ -n $line ]] || break           # EOF: the server is gone
+    line=$part$line part=''
+    while [[ $line == *$'\r' ]]; do line=${line%$'\r'}; done
+    if [[ -n $RUN_FILTER && $line =~ $RUN_FILTER ]]; then continue; fi
+    printf '%s\n' "$line"
+    if ((!online)) && [[ -n $RUN_READY && $line =~ $RUN_READY ]]; then
+      online=1
+      event server.online "server is online"
+    fi
+    declare -F on_line >/dev/null && on_line "$line"
+    ((rc == 0)) || break
+  done
+}
+
+# finish STATUS: stop the helpers, let the output drain, exit
+finish() {
+  for p in "$timer_pid" "$cat_pid"; do ((p > 0)) && kill "$p" 2>/dev/null; done
+  ((watch_pid > 0)) && wait "$watch_pid" 2>/dev/null
+  rm -f "$FIFO" "$OUT_FIFO"
+  exit "$1"
+}
+
+# send_stop: the graceful stop, once, plus the escalation timer
+send_stop() {
+  ((stop_sent)) && return
+  stop_sent=1
+  log "stop requested: $RUN_STOP to the server (up to ${STOP_TIMEOUT}s)"
+  event server.stopping "server is stopping"
+  if [[ $stop_kind == console ]]; then
+    echo "$stop_arg" >&3
+  else
+    kill -s "$stop_arg" "$server_pid" 2>/dev/null
+  fi
+  (
+    trap - TERM INT
+    sleep "$STOP_TIMEOUT"
+    kill -0 "$server_pid" 2>/dev/null || exit 0
+    echo "[$RUN_NAME] server didn't stop in ${STOP_TIMEOUT}s; sending SIG$RUN_ESCALATE"
+    kill -s "$RUN_ESCALATE" "$server_pid" 2>/dev/null
+    [[ -n $RUN_ESCALATE_CMD ]] && bash -c "$RUN_ESCALATE_CMD"
+  ) &
+  timer_pid=$!
+}
+
+# on_term: flk's SIGTERM (or a SIGINT). The trap acts at once rather than
+# leaving it to the loop: a signal that lands just before a `wait` would
+# otherwise wait out a whole restart delay, or a whole server run.
+on_term() {
+  ((stopping)) && return
+  stopping=1
+  if ((server_pid > 0)) && kill -0 "$server_pid" 2>/dev/null; then
+    send_stop
+  else
+    log "stop requested while the server isn't running"
+    ((delay_pid > 0)) && kill "$delay_pid" 2>/dev/null
+  fi
+}
+trap on_term TERM INT
+
+# --- the loop ----------------------------------------------------------------------
+
+restarts=()   # epoch seconds of recent automatic restarts
+
+while true; do
+  if ! prestart; then
+    finish 1
+  fi
+  if ((stopping)); then
+    log "stop requested before the server started"
+    event server.stopped "server stopped"
+    finish 0
+  fi
+  log "starting: $*"
+  event server.starting "server is starting"
+  reader <"$OUT_FIFO" &
+  watch_pid=$!
+  # Background jobs of a non-interactive bash start with SIGINT ignored, and
+  # a program can't un-ignore an inherited ignored signal unless it installs
+  # its own handler: reset it before exec, so RUN_STOP=signal:INT works.
+  if [[ -n $FIFO ]]; then
+    (trap - INT; exec "$@") <&3 3>&- >"$OUT_FIFO" 2>&1 &
+  else
+    (trap - INT; exec "$@") </dev/null >"$OUT_FIFO" 2>&1 &
+  fi
+  server_pid=$!
+  # A stop that came while the server was starting: deliver it now.
+  ((stopping)) && send_stop
+
+  # `wait` returns early when a trapped signal arrives; loop until it's gone.
+  status=0
+  while kill -0 "$server_pid" 2>/dev/null; do
+    wait "$server_pid"
+    status=$?
+  done
+  server_pid=0
+  wait "$watch_pid" 2>/dev/null   # the reader sees EOF once the server's gone
+  watch_pid=0
+  ((timer_pid > 0)) && kill "$timer_pid" 2>/dev/null
+  timer_pid=0
+
+  if [[ -x $RUN_HOOKS/poststop ]]; then
+    RUN_STOPPING=$stopping "$RUN_HOOKS/poststop" "$status" || log "WARNING: poststop failed (status $?)"
+  fi
+
+  if ((stopping)); then
+    log "server stopped (status $status)"
+    event server.stopped "server stopped" status:="$status"
+    finish 0
+  fi
+
+  now=$(date +%s)
+  recent=()
+  for t in "${restarts[@]}"; do ((now - t < RESTART_WINDOW)) && recent+=("$t"); done
+  restarts=("${recent[@]}")
+  if ((${#restarts[@]} >= MAX_RESTARTS)); then
+    log "server exited (status $status); $MAX_RESTARTS restarts in ${RESTART_WINDOW}s, giving up"
+    event server.gave_up "server exited (status $status) and keeps exiting; giving up, the VM will power off" status:="$status"
+    finish 1
+  fi
+  restarts+=("$now")
+
+  log "server exited on its own (status $status); restarting in ${RESTART_DELAY}s"
+  event server.restarting "server exited (status $status); restarting in ${RESTART_DELAY}s" status:="$status" delay:="$RESTART_DELAY"
+  sleep "$RESTART_DELAY" &
+  delay_pid=$!
+  ((stopping)) && kill "$delay_pid" 2>/dev/null
+  wait "$delay_pid"   # on_term kills the sleep, so a stop ends it at once
+  delay_pid=0
+  if ((stopping)); then
+    log "stop requested during restart delay; not restarting"
+    event server.stopped "server stopped"
+    finish 0
+  fi
+done

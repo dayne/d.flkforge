@@ -11,11 +11,16 @@ depends on them; ask the user when it's their call.
   built on bubbletea.
 - ~~(M1) Run wrapper shape~~: decided 2026-11-04: one versioned engine
   (`flk-run`) plus hooks the admin owns (SPEC 6.6).
-- (M1) The engine's exact env names and hook interface: settle them while
-  writing its test suite, then update SPEC 6.6.
-- (M1) The fake server for the M1 deploy test: a few lines of bash, or
-  a tiny Go binary built in a stage. Bash is enough unless it needs to
-  behave like a real server in some way bash can't.
+- ~~(M1) The engine's env names and hooks~~: settled (SPEC 6.6).
+- ~~(M1) The fake server~~: bash, `testdata/fakeserver/fakeserver`.
+- (M2) A check-tcp snippet, and `bind`, `site-env`, `backup-live-console`,
+  `backup-verify`: the rest of the catalog's network/backup rows.
+- (M2) Arguments built from env for flk-run (Valheim's `-name "$VH_NAME"`):
+  today `bash -c` or a prestart hook. Maybe a RUN_ARGS_FILE that prestart
+  writes. Decide when a second app needs it.
+- Report to the game repos' owners (not ours to change): vh-run, mc-run,
+  vs-run and en-run share the restart-delay race flk-run fixed (SPEC
+  6.6). Small window; mention it to Dayne rather than filing in their repos.
 - ~~(M1) A "made by flkforge" header~~: done in M0, two comment lines in
   each managed file pointing at `flkforge.toml` (seed files get none:
   they're the admin's).

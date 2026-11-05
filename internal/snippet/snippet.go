@@ -39,8 +39,11 @@ type Snippet struct {
 	Params     map[string]*Param `toml:"params"`
 	ParamOrder []string          `toml:"-"` // params in the order written
 
-	Base       *Base             `toml:"base"`
-	Packages   string            `toml:"packages"` // a template: package names, space-separated
+	Base     *Base  `toml:"base"`
+	Packages string `toml:"packages"` // a template: package names, space-separated
+	// User: a template naming the user the app runs as (core/user-1000).
+	// At most one snippet in a recipe sets it; the others see it as .App.User.
+	User       string            `toml:"user"`
 	Dockerfile []DockerFragment  `toml:"dockerfile"`
 	FlkToml    []FlkFragment     `toml:"flktoml"`
 	Files      []FileFragment    `toml:"file"`
@@ -127,6 +130,10 @@ type Next struct {
 	Why   string `toml:"why"`   // a template; shown after the step
 	Order int    `toml:"order"` // run steps sort by it (launch is 0, deploy is 100); default 50
 	When  string `toml:"when"`
+	// UntilEdited: a seed file's path (a template). The step goes away once
+	// the file on disk differs from what the snippet first wrote (a stub
+	// that has been filled in).
+	UntilEdited string `toml:"until_edited"`
 }
 
 var (

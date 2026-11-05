@@ -1,0 +1,41 @@
+id = "core/backup-pause"
+version = "0.1.0"
+title = "Backups: pause the VM"
+category = "backup"
+summary = "flk volumes backup freezes the VM for the copy: no downtime, and the copy is like after a power cut."
+conflicts = ["core/backup-stop"]
+source = "~/valheim.flk/flk.toml, ~/mqtt.flk/flk.toml"
+
+[params.verify]
+type = "string"
+prompt = "A host command that checks a backup (optional; gets FLK_BACKUP)"
+
+[params.keep]
+type = "int"
+min = 1
+prompt = "Backups kept per volume (default: the host's, 7)"
+
+[[flktoml]]
+text = '''
+# Backups freeze the VM for the copy (a second or two): the copy holds what
+# was on disk, like after a power cut. Fine for apps that write atomically
+# or journal; nobody is disconnected.
+[flk.backup]
+  mode = "pause"
+{{- if .P.verify}}
+  verify = {{toml .P.verify}}{{end}}
+{{- if .P.keep}}
+  keep = {{.P.keep}}{{end}}
+'''
+
+[hints]
+what = "Sets [flk.backup] mode = \"pause\"."
+under_the_hood = """
+flk volumes backup pauses the Firecracker VM, copies the volume image
+(sparse, e2fsck-checked afterwards; the journal is replayed), then resumes
+it. The app never sees a stop, so its last unsaved changes aren't in the
+copy: only what it had written. verify runs on the host after the check,
+with FLK_BACKUP set to the image file.
+"""
+gotchas = ["Unsaved state isn't in the copy: a game that saves every 30 minutes can lose up to that (live mode with save hooks avoids it)."]
+docs = ["flk help --all  (Config: [flk.backup])", "flk help volumes backup"]

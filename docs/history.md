@@ -70,3 +70,43 @@ Decided along the way: flk.toml fragments stay readable TOML text,
 parsed into records (SPEC 6.2, correcting the planning review's
 "records written by hand"); managed and seed files (SPEC 6.3); a render
 is all or nothing (6.5); `new --app` for test names.
+
+## 2026-11-04: M1 done (the run engine and one supervised app)
+
+Built: `flk-run` (SPEC 6.6) with prestart/watch/poststop hooks and
+`--exec`, its test suite against `testdata/fakeserver` (15 tests, run 15
+times in a row without a flake), and the snippets base-ubuntu,
+run-wrapper, user-1000, service, check-log, backup-pause, backup-stop,
+before-deploy, restart-outer-net, stdin-null, kill-timeout and steamcmd
+(render-tested, not deployed). Rules: kill-timeout-max/-margin,
+wrapper-restart, before-deploy-check, udp-only-check, log-check-dollar,
+busybox-user, stdin-null-console. `until_edited` steps, seed files in
+subdirectories.
+
+Found while building: bash starts background jobs with SIGINT ignored
+(fixed in flk-run before exec); two stop races the old wrappers share
+(fixed and tested); `flkforge new` failed on files in subdirectories
+(fixed).
+
+Acceptance (PLAN M1), app `flkt-forge-run` from testdata/fake-game.toml,
+following the printed steps:
+- First deploy failed its log check: `^fake: Server ready$` never
+  matches, because flk matches the raw console where lines end in
+  `\r\r`. A flk bug, BUGS.flk.md #2 (sent to the flk session); rule
+  `log-check-dollar` now warns. Recipe fixed by hand, `flkforge render`,
+  deploy v2 healthy in 4s (before_deploy took a backup).
+- The server ran as ubuntu under flk-run; `prestart` (filled in) checked
+  /data.
+- `flk exec kill -KILL` of the server: flk-run logged status 137,
+  restarted it after 5s (prestart again), online.
+- `flk machine stop`: SIGTERM became `stop` on the console, the server
+  saved, flk-run exited 0, in 1.3s.
+- `flk volumes backup` (pause, 0.0s) and `--mode stop` (down 1.2s): both
+  clean, and `debugfs` showed world.txt in each, from the latest clean stop.
+- `flkforge check`: 11 ok, 0 warn, 0 FAIL. Destroyed with
+  `flk apps destroy flkt-forge-run --yes --with-backups`. The host's
+  off-machine copies in /data/backup/flk/flkt-forge-run (2.3 MB) are never
+  deleted by flk: left for Dayne.
+- Reference: testdata/real/valheim.toml renders a flk.toml that flk reads
+  exactly like valheim-flk's (parsed and machine_config, apart from the
+  engine's RUN_* env); differences in valheim.notes.md.

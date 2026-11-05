@@ -1,0 +1,27 @@
+id = "core/restart-outer-net"
+version = "0.1.0"
+title = "Restart: one more try"
+category = "restart"
+summary = "flk restarts the VM once after a failure, then leaves it for a human: for apps whose wrapper restarts the server itself."
+source = "the four game flk.tomls"
+
+[[flktoml]]
+text = '''
+# The run wrapper restarts the server itself and gives up on a crash loop
+# (exits 1). flk's restart policy is only the outer net: restart the VM
+# once, then leave it stopped for a human.
+[[restart]]
+  policy = "on-failure"
+  retries = 1
+'''
+
+[hints]
+what = "Sets [[restart]] on-failure with retries = 1."
+under_the_hood = """
+When the VM's main process exits non-zero, flk restarts the machine,
+retries times in a row, with backoff. flk-run already restarted the server
+max_restarts times before giving up, so more VM restarts would multiply a
+crash loop.
+"""
+gotchas = []
+docs = ["flk help --all  (Config: [[restart]])"]

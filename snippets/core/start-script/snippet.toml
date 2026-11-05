@@ -18,6 +18,11 @@ default = "/start.sh"
 prompt = "Where it goes in the image"
 validate = '^/[A-Za-z0-9._/-]+$'
 
+[params.cmd]
+type = "bool"
+default = true
+prompt = "Make it the image's CMD (false: just put it in the image, for a run wrapper to start)"
+
 [params.body]
 type = "string"
 prompt = "The script (written once; after that it's yours to edit)"
@@ -42,6 +47,7 @@ text = "COPY {{.P.file}} {{.P.dest}}"
 
 [[dockerfile]]
 slot = "entry"
+when = "{{.P.cmd}}"
 text = 'CMD ["{{.P.dest}}"]'
 
 [hints]

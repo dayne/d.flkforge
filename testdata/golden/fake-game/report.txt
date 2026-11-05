@@ -1,0 +1,21 @@
+flkforge: fake-game in DIR
+
+Written:
+  Dockerfile          written  base-ubuntu, start-script, run-wrapper, user-1000, volume
+  flk.toml            written  run-wrapper, env, volume, check-log, backup-pause, before-deploy, restart-outer-net, vm
+  fakeserver          written  start-script: yours from now on: flkforge won't overwrite it
+  flk-run             written  run-wrapper
+  flk-run.d/prestart  written  run-wrapper: yours from now on: flkforge won't overwrite it
+  flkforge.toml       written  the recipe: what to render, and hashes of what was written
+
+flk config show: not checked with flk: file does not exist
+
+Not in effect yet:
+  - flk-run.d/prestart is a stub: fill it in (checks, config from the environment) before the first deploy, or drop it from hooks
+
+For you to run, in DIR:
+  flk launch --no-deploy             # registers fake-game with flk, without building or starting anything
+  flk volumes create world --size 1  # [[mounts]] needs the volume before the first deploy (one per machine)
+  flk deploy                         # builds the image and starts the app; it waits for the health checks
+
+Next: cd DIR && flk launch --no-deploy

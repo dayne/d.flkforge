@@ -86,6 +86,7 @@ suggests = ["core/run-wrapper", "core/backup-pause"]
 multi = false                 # true: usable more than once, each [[use]] with its own id
 source = "~/valheim.flk/Dockerfile"   # where the pattern was learned (docs only)
 packages = ""                 # a template: package names for the base's one install line
+user = ""                     # a template: the user the app runs as (core/user-1000); one snippet at most
 
 [params.app_id]
 type = "int"
@@ -151,6 +152,7 @@ kind = "run"                  # run | root | pending | gap: the report's parts (
 order = 50                    # run steps sort by it: launch is 0, volumes 20, deploy 100
 text = "Pin the current build: look it up on api.steamcmd.net and set build_id"
 why = "..."                   # shown after the step
+until_edited = ""             # a seed file: the step goes away once it differs from the stub
 when = '{{eq .P.build_id "latest"}}'
 ```
 
@@ -158,8 +160,9 @@ Params types: `string`, `int`, `bool`, `enum`, `list`, `port`, `size`
 (memory/disk such as `"6gb"`), `duration` (`"5m"`), `regex`, and `secret`
 (only the name is recorded; the value never is), and `map` (a table of
 strings, for `[env]`). Each param has `prompt`, `hint`, `default`,
-`required`, and optionally `values` (enum), `validate` (a regex for
-strings) and `min`/`max` (ints).
+`required`, and optionally `values` (enum, and the allowed items of a
+list), `validate` (a regex for strings and list items) and `min`/`max`
+(ints).
 
 A base snippet has a `[base]` table: `image` (a template; always a full
 name), `family` (apt, apk, dnf), `user` (the image's uid-1000 user, if
@@ -276,8 +279,13 @@ overwritten (section 6.5).
 
 ### 6.4 Rules
 
-These run after the merge. Each has an id, a level (`error` stops the
-render; `warn` and `hint` don't) and a fix. The first set comes from the
+These run after the merge, on the merged flk.toml as flk will read it
+(`internal/render/rules.go`). Each has an id, a level (`error` stops the
+render; `warn` and `hint` don't) and a fix. Built so far:
+`image-full-name`, `kill-timeout-max`, `kill-timeout-margin`,
+`wrapper-restart`, `before-deploy-check`, `udp-only-check`,
+`log-check-dollar` (BUGS.flk.md #2), `busybox-user`, `stdin-null-console`;
+`app-name-taken` comes from the host (`internal/forge`). The first set comes from the
 real apps' history:
 
 - `kill_timeout` must be above the wrapper's `STOP_TIMEOUT` with some
@@ -297,8 +305,10 @@ real apps' history:
 - Short image names fail on podman without search registries.
 - A base without `/bin/sh` (scratch, distroless) boots only on flk's
   static init, which needs flk's agent (Go on the host): warn, and say so.
-- A non-root user on a base without `setpriv` or `chroot --userspec`
-  (busybox/Alpine) silently runs as root: add the package.
+- A non-root user on a base without util-linux's `setpriv` or
+  `chroot --userspec` silently runs as root: busybox's `setpriv` applet has
+  no `--reuid`, so on Alpine add the `setpriv` package (checked
+  2026-11-04: it installs util-linux's at /usr/bin/setpriv).
 - Nothing in the image may expect systemd, or manage the network,
   hostname, `/etc/hosts` or `/etc/resolv.conf` (init writes them).
 - A volume mounted over a path the image fills (e.g. `/home`, or a
@@ -332,39 +342,58 @@ log lines turned into player events, checks before start, and config
 written from env (vh's access lists, en's JSON with bans kept).
 
 So the wrapper isn't generated from a template. It's **one versioned
-bash script, `flk-run`**, copied as is from the snippet's `files/` (it
-carries a `# flk-run vN` line, like `gamebus-event.sh v1`), configured
-by `[env]`:
+bash script, `flk-run`** (`snippets/core/run-wrapper/files/flk-run`,
+`# flk-run v1` on its first line), copied as is into the app as a managed
+file, so a fix reaches every app at its next render. It runs as
+`CMD ["/usr/local/bin/flk-run", "--", COMMAND...]` and is configured by
+`[env]` (settled in M1, 2026-11-04):
 
-    RUN_NAME        log prefix and event source (default: the app name)
-    RUN_STOP        console:LINE | signal:INT|TERM|...   how to stop gracefully
-    RUN_ESCALATE    TERM | KILL, plus an optional RUN_ESCALATE_CMD (wineserver -k)
-    RUN_READY       regex; the first match emits server.online
-    RUN_FILTER      regex; matching lines are dropped from the log
-    STOP_TIMEOUT RESTART_DELAY MAX_RESTARTS RESTART_WINDOW   as today
-    RUN_EVENTS      1 = print gamebus events (default 1)
+    RUN_STOP          console:LINE | signal:NAME   the server's clean stop (default signal:TERM)
+    STOP_TIMEOUT      seconds before forcing it (default 90; < kill_timeout)
+    RUN_ESCALATE      TERM | KILL after that (default TERM; KILL when the stop is SIGTERM)
+    RUN_ESCALATE_CMD  a command after the escalation (wineserver -k)
+    RUN_READY         an extended regex; the first match per start is server.online
+    RUN_FILTER        an extended regex; matching output lines are dropped
+    RUN_EVENTS        1 (default): gamebus event lines; 0: none
+    RUN_CONSOLE       1: a console FIFO even with a signal stop (for hooks)
+    RUN_TICK          seconds between on_tick calls (default 60)
+    RUN_HOOKS         the hooks' directory (default /usr/local/lib/flk-run)
+    RUN_NAME          log prefix (default the app name)
+    RESTART_DELAY MAX_RESTARTS RESTART_WINDOW   as in the game wrappers (10, 5, 600)
 
-and the command after `--` (`CMD ["flk-run", "--", "java", ...]`).
-The app-specific parts are optional hook files next to it, which
-flkforge writes as commented stubs and the admin owns:
+The server's output goes through a FIFO to a reader that strips `\r`,
+filters, reports the ready line and calls the watch hook. A console
+stop writes the line to a FIFO held open on fd 3 (typed `flk console`
+input is forwarded to it). Three details the old wrappers got wrong or
+never hit, each with a test:
+- non-interactive bash starts background jobs with SIGINT ignored, and a
+  program can't un-ignore it unless it installs a handler: flk-run
+  resets it before exec, so `signal:INT` reaches any server;
+- a SIGTERM that lands just before a `wait` used to wait out the whole
+  restart delay: the trap now kills the delay itself;
+- a stop during `prestart` or the server's launch is delivered as soon as
+  the server is running, or ends flk-run before it starts.
 
-- `prestart`: runs before each start, and a non-zero exit is fatal
-  (checks, writing config from env). It runs before every restart, not
-  just the first start, because en-run rewrites its config each time.
-- `watch`: sourced by the engine, it defines `on_line LINE`, which is
-  called for each output line after filtering, along with `event` and
-  `console TEXT` (writes to the server console, for vs-style polling).
-- `poststop`: runs after the server exits (en-run keeps its bans here).
+Hooks, in RUN_HOOKS, each optional; flkforge writes stubs (seed files in
+`flk-run.d/`, copied to /usr/local/lib/flk-run) that the admin owns:
 
-A daemon that needs no supervision (mqtt-run: setup, then `exec`) uses
-`flk-run --exec`, which runs `prestart` and then `exec`s the command, or
-just a `prestart` and a plain CMD. The engine needs bash; on Alpine
-bases the `run-wrapper` snippet adds the package, and the `--exec`
-form works in POSIX sh.
+- `prestart`: an executable run before every start; non-zero stops
+  flk-run (exit 1). Checks, and config written from env.
+- `watch`: bash, sourced by the reader. It may define `on_line LINE` and
+  `on_tick`, and use `event`, `console TEXT` and `log`.
+- `poststop`: an executable run after every exit, with the exit status as
+  `$1` and `RUN_STOPPING=1` when flk asked for the stop.
 
-Fixing the engine in its snippet reaches every app on its next render.
-Drift detection covers the engine, not the hooks: the hooks belong to
-the admin from the moment they're written.
+`flk-run --exec -- COMMAND` runs prestart and then execs the command: no
+supervision, for a daemon that handles SIGTERM itself (mqtt-run). The
+`gamebus_event` function is inside flk-run (with its `gamebus-event.sh v1`
+marker), so there's no separate gamebus-events snippet: `events = false`
+turns the lines off. The engine needs bash; on Alpine the snippet adds it.
+
+Tested against `testdata/fakeserver` in `internal/runengine` (15 tests:
+console and signal stops, escalation, restarts and give-up, stops during
+the restart delay and prestart, filter, ready, events, every hook,
+`--exec`, bad settings), and on a real VM in PLAN M1's deploy test.
 
 ## 7. Validation and `check`
 
@@ -552,3 +581,7 @@ recipe's `[[vm]]` gives; fly.io deployment.
   records by flkforge's own parser (6.2), not records written by hand;
   the snippet format settled (4); managed and seed files (6.3); render is
   all or nothing (6.5); `new --app`, `render --dry-run`, `snippets --dir`.
+- 2026-11-04 (M1): the run engine as built (6.6): its env names, hooks
+  and the races it fixes; no separate gamebus-events snippet; `user`,
+  list `values` and `until_edited` in the snippet format (4); the rules
+  implemented so far (6.4).

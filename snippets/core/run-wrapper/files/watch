@@ -1,0 +1,17 @@
+# watch: sourced by flk-run's output reader (bash). Define on_line to act
+# on each line of the server's output, and on_tick to run every RUN_TICK
+# seconds (default 60). You have:
+#   event TYPE MESSAGE [key=value ... key:=number]   a gamebus event line
+#   console TEXT                                     type into the server's console
+#   log TEXT                                         a line in flk logs
+# Anchor the regexes on the line's exact shape, so chat can't fake them.
+
+on_line() {
+  local line=$1
+  # if [[ $line =~ ^\[Server\]\ ([A-Za-z0-9_]{1,30})\ joined$ ]]; then
+  #   event player.join "${BASH_REMATCH[1]} joined the game" player="${BASH_REMATCH[1]}"
+  # fi
+  return 0
+}
+
+# on_tick() { console "save"; }

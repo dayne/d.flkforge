@@ -129,7 +129,7 @@ func (p *Param) Coerce(v any) (any, error) {
 	case "list":
 		switch l := v.(type) {
 		case []string:
-			return l, nil
+			return p.checkList(l)
 		case []any:
 			out := make([]string, len(l))
 			for i, e := range l {
@@ -139,7 +139,7 @@ func (p *Param) Coerce(v any) (any, error) {
 				}
 				out[i] = s
 			}
-			return out, nil
+			return p.checkList(out)
 		}
 		return nil, fmt.Errorf("want a list of strings, got %s", show(v))
 	case "map":
@@ -216,4 +216,17 @@ func sortedKeys[V any](m map[string]V) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// checkList: each item of a list must be one of Values, when there are any.
+func (p *Param) checkList(l []string) ([]string, error) {
+	for _, s := range l {
+		if len(p.Values) > 0 && !slices.Contains(p.Values, s) {
+			return nil, fmt.Errorf("%q isn't one of %s", s, strings.Join(p.Values, ", "))
+		}
+		if p.Validate != "" && !regexp.MustCompile(p.Validate).MatchString(s) {
+			return nil, fmt.Errorf("%q doesn't match %s", s, p.Validate)
+		}
+	}
+	return l, nil
 }

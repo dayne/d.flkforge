@@ -1,0 +1,55 @@
+# fake-game: made by flkforge from flkforge.toml. Change the recipe and run
+# `flkforge render`, or edit this file and stop using flkforge for it.
+app = "fake-game"
+
+# flk-run stops the server cleanly within stop_timeout (20s); give it
+# that, plus a margin, before flk kills the VM.
+kill_timeout = 50
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  # flk-run, the run engine (see flk-run for details)
+  RUN_STOP = "console:stop"
+  STOP_TIMEOUT = "20"                # then SIGTERM (< kill_timeout)
+  RUN_READY = "^fake: Server ready"  # reported as server.online
+  RESTART_DELAY = "5"                # seconds before restarting after a crash
+  MAX_RESTARTS = "5"                 # give up after this many restarts...
+  RESTART_WINDOW = "600"             # ...within this many seconds
+
+  # the fake server
+  FAKE_READY_AFTER = "3"
+  FAKE_STOP = "console"
+
+# The run wrapper restarts the server itself and gives up on a crash loop
+# (exits 1). flk's restart policy is only the outer net: restart the VM
+# once, then leave it stopped for a human.
+[[restart]]
+  policy = "on-failure"
+  retries = 1
+
+[flk]
+  keep_releases = 3  # images kept for flk releases rollback (default 2)
+
+# Backups freeze the VM for the copy (a second or two): the copy holds what
+# was on disk, like after a power cut. Fine for apps that write atomically
+# or journal; nobody is disconnected.
+[flk.backup]
+  mode = "pause"
+  before_deploy = true
+
+# A deploy waits for this line on the console; a machine that doesn't log
+# it within grace_period goes back to its previous release.
+[checks.ready]
+  type = "log"
+  match = "^fake: Server ready"
+  grace_period = "60s"
+
+[[vm]]
+  cpus = 1
+  memory = "256mb"
+
+[[mounts]]
+  source = "world"
+  destination = "/data"

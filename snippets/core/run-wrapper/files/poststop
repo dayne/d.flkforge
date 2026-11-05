@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# poststop: flk-run runs this after every exit of the server, with its exit
+# status as $1, and RUN_STOPPING=1 when flk asked it to stop (0: a crash or
+# an exit on its own). Keep it quick: it runs inside kill_timeout.
+set -uo pipefail
+status=$1
+# echo "server exited with $status (stopping: $RUN_STOPPING)"

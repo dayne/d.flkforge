@@ -1,0 +1,59 @@
+id = "core/service"
+version = "0.1.0"
+title = "Service port"
+category = "network"
+summary = "Forward a host port to a port in the VM, TCP or UDP."
+multi = true
+source = "~/minecraft.flk/flk.toml, ~/vintagestory.flk/flk.toml (the same port on tcp and udp), ~/valheim.flk/flk.toml"
+
+[params.port]
+type = "port"
+required = true
+prompt = "The port the server listens on inside the VM"
+
+[params.protocol]
+type = "enum"
+values = ["tcp", "udp"]
+default = "tcp"
+prompt = "tcp or udp (a port on both: use this snippet twice)"
+
+[params.host_port]
+type = "port"
+prompt = "Host port to forward (default: the same number)"
+
+[params.comment]
+type = "string"
+prompt = "What it's for (a comment above it)"
+
+[[flktoml]]
+text = '''
+{{- if .P.comment}}
+# {{.P.comment}}{{end}}
+[[services]]
+  internal_port = {{.P.port}}
+  protocol = {{toml .P.protocol}}
+  [[services.ports]]
+    port = {{if .P.host_port}}{{.P.host_port}}{{else}}{{.P.port}}{{end}}
+'''
+
+[[next]]
+kind = "root"
+when = '{{if lt (default .P.port .P.host_port) 1024}}true{{end}}'
+text = "sudo FLK_MIN_PORT={{default .P.port .P.host_port}} ~/flk/setup-host.sh"
+why = "flk refuses host ports below 1024 until the host allows them (flk help --all: [[services]])"
+
+[hints]
+what = "Adds a [[services]] entry: flk forwards the host port to the VM's port."
+under_the_hood = """
+flk forwards [[services.ports]] port on the host's addresses to
+internal_port on the machine's IP, with nftables. Forwarding skips
+127.0.0.1: from the host, use the LAN IP or the machine IP. The first
+internal_port is what a deploy without checks waits for (TCP only: a
+UDP-only app needs a log check).
+"""
+gotchas = [
+  "Host ports below 1024 are refused unless the host allows them (a root step).",
+  "A port a host process already listens on is refused: flk ports shows why.",
+  "To bind to one host address only: [flk] bind (later: core/bind).",
+]
+docs = ["flk help --all  (Config: [[services]])", "flk ports"]

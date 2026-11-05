@@ -101,6 +101,7 @@ func (e *Env) Render(dir string, r *recipe.Recipe, opts RenderOpts) (*Outcome, e
 	}
 	out := &Outcome{Dir: dir, App: r.App, Findings: res.Findings, Steps: res.Steps}
 	e.hostSteps(dir, out)
+	out.Steps = editedSteps(dir, res, out.Steps)
 	if errs := res.Errors(); len(errs) > 0 {
 		out.Refused = "a rule failed: " + errs[0].Msg
 		return out, nil
@@ -180,7 +181,7 @@ func (e *Env) Render(dir string, r *recipe.Recipe, opts RenderOpts) (*Outcome, e
 		// Only the .flkforge-new files, so the admin can compare.
 		for _, w := range writes {
 			if strings.HasSuffix(w.path, ".flkforge-new") {
-				if err := os.WriteFile(w.path, w.content, w.mode); err != nil {
+				if err := writeFile(w.path, w.content, w.mode); err != nil {
 					return nil, err
 				}
 			}
@@ -240,6 +241,9 @@ func (e *Env) validate(out *Outcome, flkToml []byte) {
 
 // writeFile writes atomically (a temp file, then rename) with mode.
 func writeFile(path string, content []byte, mode fs.FileMode) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
 	tmp := path + ".flkforge-tmp"
 	if err := os.WriteFile(tmp, content, mode); err != nil {
 		return err
@@ -365,4 +369,21 @@ func (e *Env) hostSteps(dir string, out *Outcome) {
 		keep = append(keep, s)
 	}
 	out.Steps = keep
+}
+
+// editedSteps drops the steps whose seed file has been filled in: it's on
+// disk and differs from what the snippet writes.
+func editedSteps(dir string, res *render.Result, steps []render.Step) []render.Step {
+	var keep []render.Step
+	for _, s := range steps {
+		if s.UntilEdited != "" {
+			f := res.File(s.UntilEdited)
+			disk, err := os.ReadFile(filepath.Join(dir, s.UntilEdited))
+			if f != nil && err == nil && !bytes.Equal(disk, f.Content) {
+				continue
+			}
+		}
+		keep = append(keep, s)
+	}
+	return keep
 }

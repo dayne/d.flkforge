@@ -1,0 +1,32 @@
+id = "core/base-ubuntu"
+version = "0.1.0"
+title = "Ubuntu base"
+category = "base"
+summary = "Ubuntu LTS with apt and glibc: what prebuilt game servers and most downloads expect."
+source = "~/valheim.flk/Dockerfile, ~/opencode.flk/Dockerfile"
+
+[params.version]
+type = "string"
+default = "24.04"
+prompt = "Ubuntu version (the image tag)"
+hint = "An LTS release such as 24.04. The image is about 80 MB."
+validate = '^[0-9]{2}\.[0-9]{2}$'
+
+[base]
+image = "docker.io/library/ubuntu:{{.P.version}}"
+family = "apt"
+user = "ubuntu"
+
+[hints]
+what = "Starts the image from Ubuntu: bash, coreutils, util-linux (setpriv) and apt."
+under_the_hood = """
+flk deploy builds the Dockerfile with podman and turns the image into the
+VM's root filesystem. Ubuntu's images have a user with uid 1000 named
+ubuntu, which core/user-1000 uses: flk's init switches to it with setpriv
+before it runs the app.
+"""
+gotchas = [
+  "The image is minimal: no ca-certificates, curl or tzdata until you add them (core/packages).",
+  "apt in a Dockerfile: flkforge writes one install line that also clears apt's lists, so the layer stays small.",
+]
+docs = ["flk help --all  (Machines: the guest is a VM)", "flk help first-app"]

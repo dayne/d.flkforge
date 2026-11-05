@@ -1,0 +1,22 @@
+id = "core/stdin-null"
+version = "0.1.0"
+title = "No console input"
+category = "misc"
+summary = "The app's stdin is /dev/null instead of flk's serial console: for servers with no console."
+source = "~/valheim.flk/flk.toml"
+
+[[flktoml]]
+text = '''
+[flk]
+  stdin = "null"  # the app has no console input
+'''
+
+[hints]
+what = "Sets [flk] stdin = \"null\"."
+under_the_hood = """
+By default the app's stdin is the VM's serial console, which flk console
+types into. Some servers misbehave with a console attached (spinning on
+EOF, echoing prompts); stdin = "null" gives them /dev/null.
+"""
+gotchas = ["flk console can't type into the app any more (flk-run's console stop still works: it has its own FIFO)."]
+docs = ["flk help --all  (Config: [flk] stdin)", "flk help console"]

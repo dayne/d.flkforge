@@ -1,0 +1,38 @@
+id = "core/backup-stop"
+version = "0.1.0"
+title = "Backups: stop the app"
+category = "backup"
+summary = "flk volumes backup stops the machine, copies, and starts it: a clean copy, with downtime."
+conflicts = ["core/backup-pause"]
+source = "~/vintagestory.flk/flk.toml"
+
+[params.verify]
+type = "string"
+prompt = "A host command that checks a backup (optional; gets FLK_BACKUP)"
+
+[params.keep]
+type = "int"
+min = 1
+prompt = "Backups kept per volume (default: the host's, 7)"
+
+[[flktoml]]
+text = '''
+# Backups stop the machine (a clean stop, through the run wrapper), copy,
+# and start it again: the copy is exactly what the app saved.
+[flk.backup]
+  mode = "stop"
+{{- if .P.verify}}
+  verify = {{toml .P.verify}}{{end}}
+{{- if .P.keep}}
+  keep = {{.P.keep}}{{end}}
+'''
+
+[hints]
+what = "Sets [flk.backup] mode = \"stop\" (flk's default, written out)."
+under_the_hood = """
+flk volumes backup stops the machine the way flk machine stop does (SIGTERM,
+then kill_timeout), copies the volume, checks it with e2fsck, then starts
+the machine again. The downtime is the stop, the copy and the start.
+"""
+gotchas = ["Everyone is disconnected for the length of the backup."]
+docs = ["flk help --all  (Config: [flk.backup])", "flk help volumes backup"]

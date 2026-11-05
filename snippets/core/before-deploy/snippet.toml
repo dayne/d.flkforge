@@ -1,0 +1,36 @@
+id = "core/before-deploy"
+version = "0.1.0"
+title = "Back up before each deploy"
+category = "backup"
+summary = "Each deploy backs up the volumes while the machine is stopped, so a release that fails rolls back with its data."
+source = "the game flk.tomls, ~/mqtt.flk/flk.toml"
+
+[params.keep_releases]
+type = "int"
+default = 3
+min = 1
+prompt = "Release images kept for flk releases rollback"
+hint = "For a Steam game the old builds exist only as these images."
+
+[merge]
+"flk.keep_releases" = "max"
+
+[[flktoml]]
+text = '''
+[flk]
+  keep_releases = {{.P.keep_releases}}  # images kept for flk releases rollback (default 2)
+
+[flk.backup]
+  before_deploy = true
+'''
+
+[hints]
+what = "Sets [flk.backup] before_deploy = true and keeps more release images."
+under_the_hood = """
+During a deploy, after a machine stops and before it boots the new release,
+flk backs up its volumes. If the new release fails its checks, flk
+releases rollback --with-volumes can put the volumes back as they were on
+the old release. It needs a health check to judge a release failed.
+"""
+gotchas = ["Without a check, no deploy is ever judged failed."]
+docs = ["flk help --all  (Config: [flk.backup])", "flk help releases rollback"]

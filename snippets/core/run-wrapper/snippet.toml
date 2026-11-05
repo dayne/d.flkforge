@@ -1,0 +1,193 @@
+id = "core/run-wrapper"
+version = "0.1.0"
+title = "Run engine (flk-run)"
+category = "wrapper"
+summary = "Supervise a server: flk's stop becomes the server's own clean stop, crashes restart, events go to the log."
+requires = ["category:base"]
+suggests = ["core/restart-outer-net", "core/check-log", "core/kill-timeout"]
+source = "~/minecraft.flk/mc-run, ~/vintagestory.flk/vs-run, ~/valheim.flk/vh-run, ~/enshrouded.flk/en-run (what they share); ~/mqtt.flk/mqtt-run (--exec)"
+packages = '{{if eq .App.Family "apk"}}bash{{end}}'
+
+[params.command]
+type = "list"
+required = true
+prompt = "The server's command and arguments (exec form: [\"/server/srv\", \"-port\", \"2456\"])"
+hint = "No shell expansion: flk-run runs it as is. For arguments built from the environment, use [\"bash\", \"-c\", \"exec ./srv -name \\\"$NAME\\\"\"] or write them in a prestart hook."
+
+[params.stop]
+type = "string"
+default = "signal:TERM"
+prompt = "How the server stops cleanly: console:LINE (typed into its console) or signal:NAME"
+hint = "Minecraft: console:stop. Vintage Story: console:/stop. Valheim (Unity) and Wine servers: signal:INT. Check the server's docs: the wrong one means no save on stop."
+validate = '^(console:.+|signal:[A-Z0-9]+)$'
+
+[params.stop_timeout]
+type = "int"
+default = 90
+min = 1
+max = 270
+prompt = "Seconds the server gets to stop before flk-run forces it"
+hint = "flkforge sets kill_timeout to this plus 30, so flk doesn't kill the VM first (flk allows at most 300)."
+
+[params.escalate]
+type = "enum"
+values = ["TERM", "KILL"]
+prompt = "The signal after stop_timeout (default: TERM, or KILL when the stop itself is SIGTERM)"
+
+[params.escalate_cmd]
+type = "string"
+prompt = "A command to run after that signal (optional)"
+hint = "Wine servers: wineserver -k."
+
+[params.ready]
+type = "regex"
+prompt = "A regex for the server's ready line (reported as server.online)"
+hint = "Use the same line for core/check-log, so deploys wait for it too."
+
+[params.filter]
+type = "regex"
+prompt = "A regex for output lines to drop from the log (optional)"
+
+[params.events]
+type = "bool"
+default = true
+prompt = "Print gamebus event lines (server up/down, restarts)"
+hint = "~/m.gamebus reads them from flk logs and sends them to MQTT and Discord. Without a hub they're just log lines."
+
+[params.restart_delay]
+type = "int"
+default = 10
+min = 0
+prompt = "Seconds before restarting a server that exited on its own"
+
+[params.max_restarts]
+type = "int"
+default = 5
+min = 1
+prompt = "Give up after this many restarts..."
+
+[params.restart_window]
+type = "int"
+default = 600
+min = 1
+prompt = "...within this many seconds"
+
+[params.hooks]
+type = "list"
+default = []
+values = ["prestart", "watch", "poststop"]
+prompt = "Hooks to write stubs for: prestart, watch, poststop"
+hint = "prestart: checks and config written from env, before every start. watch: turn log lines into events (players joining). poststop: after every exit. The stubs are yours to fill in."
+
+[params.exec]
+type = "bool"
+default = false
+prompt = "Don't supervise: run prestart, then exec the command (a daemon that handles SIGTERM itself)"
+
+[merge]
+kill_timeout = "max"
+
+[[file]]
+path = "flk-run"
+template = "flk-run"
+verbatim = true
+mode = "755"
+
+[[file]]
+path = "flk-run.d/prestart"
+when = '{{has .P.hooks "prestart"}}'
+template = "prestart"
+own = "seed"
+mode = "755"
+
+[[file]]
+path = "flk-run.d/watch"
+when = '{{has .P.hooks "watch"}}'
+template = "watch"
+own = "seed"
+mode = "644"
+
+[[file]]
+path = "flk-run.d/poststop"
+when = '{{has .P.hooks "poststop"}}'
+template = "poststop"
+own = "seed"
+mode = "755"
+
+[[dockerfile]]
+slot = "copy"
+text = '''
+# The run engine (flkforge's core/run-wrapper) and its hooks. Late in the
+# file, so changing them doesn't rebuild the layers above.
+COPY flk-run /usr/local/bin/flk-run
+{{- if .P.hooks}}
+COPY flk-run.d/ /usr/local/lib/flk-run/{{end}}'''
+
+[[dockerfile]]
+slot = "entry"
+text = 'CMD ["/usr/local/bin/flk-run"{{if .P.exec}}, "--exec"{{end}}, "--"{{range .P.command}}, {{json .}}{{end}}]'
+
+[[flktoml]]
+when = "{{not .P.exec}}"
+text = '''
+# flk-run stops the server cleanly within stop_timeout ({{.P.stop_timeout}}s); give it
+# that, plus a margin, before flk kills the VM.
+kill_timeout = {{add .P.stop_timeout 30}}
+'''
+
+[[flktoml]]
+text = '''
+[env]
+  # flk-run, the run engine (see flk-run for details)
+  RUN_STOP = {{toml .P.stop}}
+{{- if not .P.exec}}
+  STOP_TIMEOUT = "{{.P.stop_timeout}}"  # then {{if .P.escalate}}SIG{{.P.escalate}}{{else if eq .P.stop "signal:TERM"}}SIGKILL{{else}}SIGTERM{{end}} (< kill_timeout)
+{{- if .P.escalate}}
+  RUN_ESCALATE = {{toml .P.escalate}}{{end}}
+{{- if .P.escalate_cmd}}
+  RUN_ESCALATE_CMD = {{toml .P.escalate_cmd}}{{end}}
+{{- if .P.ready}}
+  RUN_READY = {{toml .P.ready}}  # reported as server.online{{end}}
+{{- if .P.filter}}
+  RUN_FILTER = {{toml .P.filter}}  # dropped from the log{{end}}
+{{- if not .P.events}}
+  RUN_EVENTS = "0"{{end}}
+  RESTART_DELAY = "{{.P.restart_delay}}"  # seconds before restarting after a crash
+  MAX_RESTARTS = "{{.P.max_restarts}}"  # give up after this many restarts...
+  RESTART_WINDOW = "{{.P.restart_window}}"  # ...within this many seconds{{end}}
+'''
+
+[[next]]
+kind = "pending"
+when = '{{has .P.hooks "prestart"}}'
+until_edited = "flk-run.d/prestart"
+text = "flk-run.d/prestart is a stub"
+why = "fill it in (checks, config from the environment) before the first deploy, or drop it from hooks"
+
+[[next]]
+kind = "pending"
+when = '{{has .P.hooks "watch"}}'
+until_edited = "flk-run.d/watch"
+text = "flk-run.d/watch is a stub"
+why = "add on_line rules for the server's log lines, or drop it from hooks"
+
+[hints]
+what = "Runs the server under flk-run, a supervisor shared by every app that uses this snippet, and wires up how it stops."
+under_the_hood = """
+flk-run is the VM's main process. On flk machine stop (or a deploy), flk
+sends it SIGTERM, then kills the VM after kill_timeout. flk-run turns the
+SIGTERM into the server's own clean stop (a console line through a FIFO, or
+a signal), waits stop_timeout, then forces it. A server that exits on its
+own is restarted after restart_delay; too many restarts in restart_window
+and flk-run exits 1, the VM powers off, and flk's [[restart]] decides
+(retries = 1: one more try, then a human).
+flk-run is a managed file: a fix in the snippet reaches every app at its
+next flkforge render. The hooks are yours.
+"""
+gotchas = [
+  "The wrong stop method means no save on stop: test it with flk machine stop and read flk logs.",
+  "Pair it with core/restart-outer-net, or a crash loop is multiplied by flk's retries.",
+  "Needs bash in the image (added on Alpine).",
+  "The command has no shell expansion; use bash -c or a prestart hook for arguments from env.",
+]
+docs = ["flk help --all  (Machines: stopping; Config: kill_timeout, [[restart]])", "flk help operate", "~/m.gamebus/SPEC.md (events)"]

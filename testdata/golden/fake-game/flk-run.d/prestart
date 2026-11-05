@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# prestart: flk-run runs this before every start of the server. Exit
+# non-zero to stop (flk-run exits 1 and the VM powers off), with a FATAL
+# line that says what to fix.
+#
+# Typical: check the volume is mounted and writable, check settings and
+# secrets, write the server's config file from the environment.
+set -euo pipefail
+
+# [[ -w /data ]] || { echo "FATAL: /data isn't writable by $(id -u); is the volume mounted?"; exit 1; }

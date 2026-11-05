@@ -1,0 +1,32 @@
+id = "core/kill-timeout"
+version = "0.1.0"
+title = "Stop timeout"
+category = "misc"
+summary = "How long flk waits after SIGTERM before it kills the VM."
+source = "every game flk.toml"
+
+[params.seconds]
+type = "int"
+required = true
+min = 1
+max = 300
+prompt = "Seconds (flk's default is 10, at most 300)"
+
+[merge]
+kill_timeout = "max"
+
+[[flktoml]]
+text = '''
+# Time to stop cleanly before flk kills the VM.
+kill_timeout = {{.P.seconds}}
+'''
+
+[hints]
+what = "Sets kill_timeout."
+under_the_hood = """
+flk machine stop (and every deploy and stop-mode backup) sends the app
+SIGTERM, waits kill_timeout, then kills the VM. core/run-wrapper sets it
+to its stop_timeout plus 30 already; when both are used, the larger wins.
+"""
+gotchas = ["Too short and the app is killed mid-save; it also makes deploys and backups that long at worst."]
+docs = ["flk help --all  (Config: kill_timeout)"]

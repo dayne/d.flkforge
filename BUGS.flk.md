@@ -49,3 +49,27 @@ pointing here. Without a check, a deploy waits for `internal_port`.
 **Asked:** fix the constant, and a test case with an http check.
 
 Status: fixed in flk 4294558 (branch r1-reliability, not on main yet): `::Net` in `check_passes?`, both the request and the rescue list (the rescue raised the same NameError). Test: `tests/cases/10-hello.sh` test_http_checks_gate_the_deploy (200 deploys, 500 fails the check and rolls back).
+
+## 2. Log checks never match a regex that ends in `$` (2026-11-04)
+
+**What happens:** `[checks.ready] type = "log", match = "^fake: Server
+ready$"` fails its check although the line is in the console log.
+`check_passes?` (deploy.rb ~315) matches the regex against the raw tail
+of `console.log`, where every line ends in `\r\r\n` (the serial console;
+`flk logs` shows them as `^M^M`). Ruby's `$` matches before `\n`, so after
+`ready` comes `\r\r` and `$` never matches. `^` works.
+
+**Seen:** flkforge M1, `flkt-forge-run` v1 (flk at f7f9b4a): the log has
+`fake: Server ready`, the check timed out after 60s, deploy exit 1.
+No real app ends a check with `$` (vs-run's comment notes the `\r\r`).
+
+**Why flkforge needs it:** `core/check-log` takes the admin's regex, and
+anchoring both ends is the natural way to stop chat from faking a ready
+line. The same regex works in flk-run (`RUN_READY`), which strips `\r`.
+
+**Meanwhile:** flkforge's rule `log-check-dollar` warns about a `$`, and
+the check-log hint says not to use one.
+
+**Asked:** match line by line with trailing `\r` removed (e.g.
+`tail.each_line.any? { _1.chomp.delete_suffix("\r")... }`, or strip `\r`
+before matching), or document it in `flk help --all` ([checks.NAME]).

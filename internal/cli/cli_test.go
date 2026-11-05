@@ -12,6 +12,7 @@ import (
 
 	"github.com/dayne/d.flkforge/internal/flk"
 	"github.com/dayne/d.flkforge/internal/forge"
+	"github.com/dayne/d.flkforge/internal/recipe"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden files")
@@ -28,26 +29,37 @@ func run(t *testing.T, env func() *forge.Env, tty bool, args ...string) (string,
 	return out.String(), errb.String(), code
 }
 
-// TestGoldenHello: PLAN M0's acceptance test, the files half. The recipe
-// for flk's examples/hello renders the files in testdata/golden/hello.
-func TestGoldenHello(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "hello")
-	out, errs, code := run(t, noFlk, false, "new", dir, "--recipe", "../../testdata/hello.toml", "--yes")
+// TestGolden: PLAN M0's and M1's acceptance tests, the files half. Each
+// recipe renders exactly the files in testdata/golden/NAME (make golden
+// rewrites them after an intended change; review with git diff).
+func TestGolden(t *testing.T) {
+	for name, files := range map[string][]string{
+		"hello":     {"Dockerfile", "flk.toml", "start.sh", "flkforge.toml"},
+		"fake-game": {"Dockerfile", "flk.toml", "fakeserver", "flk-run", "flk-run.d/prestart", "flkforge.toml"},
+	} {
+		t.Run(name, func(t *testing.T) { golden(t, name, files) })
+	}
+}
+
+func golden(t *testing.T, name string, names []string) {
+	dir := filepath.Join(t.TempDir(), name)
+	out, errs, code := run(t, noFlk, false, "new", dir, "--recipe", "../../testdata/"+name+".toml", "--yes")
 	if code != 0 {
 		t.Fatalf("exit %d: %s%s", code, out, errs)
 	}
-	golden := "../../testdata/golden/hello"
+	golden := "../../testdata/golden/" + name
 	files := map[string]string{"report.txt": strings.ReplaceAll(out, dir, "DIR")}
-	for _, f := range []string{"Dockerfile", "flk.toml", "start.sh", "flkforge.toml"} {
+	for _, f := range names {
 		b, err := os.ReadFile(filepath.Join(dir, f))
 		if err != nil {
 			t.Fatal(err)
 		}
 		files[f] = string(b)
 	}
-	for name, got := range files {
-		path := filepath.Join(golden, name)
+	for f, got := range files {
+		path := filepath.Join(golden, f)
 		if *update {
+			os.MkdirAll(filepath.Dir(path), 0o755)
 			if err := os.WriteFile(path, []byte(got), 0o644); err != nil {
 				t.Fatal(err)
 			}
@@ -58,18 +70,43 @@ func TestGoldenHello(t *testing.T) {
 			t.Fatalf("%v (make golden writes it)", err)
 		}
 		if got != string(want) {
-			t.Errorf("%s differs from %s (make golden rewrites it; review with git diff):\n%s", name, path, got)
+			t.Errorf("%s differs from %s (make golden rewrites it; review with git diff):\n%s", f, path, got)
 		}
 	}
-	if st, err := os.Stat(filepath.Join(dir, "start.sh")); err != nil || st.Mode().Perm() != 0o755 {
-		t.Errorf("start.sh should be 0755: %v %v", st.Mode(), err)
+	for _, f := range []string{"start.sh", "fakeserver", "flk-run", "flk-run.d/prestart"} {
+		if st, err := os.Stat(filepath.Join(dir, f)); err == nil && st.Mode().Perm() != 0o755 {
+			t.Errorf("%s should be 0755, is %v", f, st.Mode())
+		}
 	}
 
 	// A second render changes nothing.
 	out, _, code = run(t, noFlk, false, "render", dir)
-	if code != 0 || strings.Contains(out, " written  base") {
+	if code != 0 {
 		t.Errorf("second render: exit %d\n%s", code, out)
 	}
+	for _, l := range strings.Split(out, "\n") {
+		if strings.Contains(l, " written ") && !strings.HasPrefix(strings.TrimSpace(l), "flkforge.toml") {
+			t.Errorf("second render rewrote a file: %s", l)
+		}
+	}
+}
+
+// The fake game's recipe carries testdata/fakeserver as its start script.
+func TestFakeGameCarriesFakeServer(t *testing.T) {
+	want, err := os.ReadFile("../../testdata/fakeserver/fakeserver")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := recipe.Read("../../testdata/fake-game.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, u := range r.Uses {
+		if u.Snippet == "core/start-script" && u.Params["body"] == string(want) {
+			return
+		}
+	}
+	t.Error("testdata/fake-game.toml's start-script body isn't testdata/fakeserver/fakeserver: copy it in")
 }
 
 // TestHelloMatchesFlkExample: PLAN M0's acceptance test, the flk half.
@@ -212,5 +249,19 @@ func TestHelpAllJSON(t *testing.T) {
 	}
 	if h.Schema != HelpSchema || h.Version != Version || len(h.Commands) != len(commands) {
 		t.Errorf("got %+v", h)
+	}
+}
+
+// Filling in a hook stub ends its "not in effect yet" line.
+func TestFilledStubDropsItsStep(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "app")
+	out, _, code := run(t, noFlk, false, "new", dir, "--recipe", "../../testdata/fake-game.toml", "--yes")
+	if code != 0 || !strings.Contains(out, "prestart is a stub") {
+		t.Fatalf("exit %d\n%s", code, out)
+	}
+	os.WriteFile(filepath.Join(dir, "flk-run.d", "prestart"), []byte("#!/bin/sh\necho mine\n"), 0o755)
+	out, _, _ = run(t, noFlk, false, "render", dir)
+	if strings.Contains(out, "prestart is a stub") {
+		t.Errorf("still a stub after editing:\n%s", out)
 	}
 }

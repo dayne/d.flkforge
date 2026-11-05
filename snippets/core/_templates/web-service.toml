@@ -12,8 +12,8 @@ summary = "A small HTTP app on Alpine: a start script, the HTTP port, a health c
   params = { port = 8080 }
 
 [[use]]
-  snippet = "core/check-tcp"
-  params = { port = 8080, grace = "30s" }
+  snippet = "core/check-http"
+  params = { port = 8080, path = "/", grace = "30s" }
 
 [[use]]
   snippet = "core/volume"

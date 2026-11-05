@@ -61,8 +61,8 @@ source is `~/flk/share/guide.md`, and the guides by stage are
   `chroot` that takes `--userspec`. Without either, it logs a warning and
   **runs the app as root**. Busybox's `setpriv` applet lacks `--reuid`, so
   on Alpine a non-root user needs util-linux's: the `setpriv` package
-  (checked 2026-11-04). Until flk c887f14 (branch r1-reliability), init
-  even called busybox's and died at boot. The no-shell init switches users itself. A fix in flk is planned
+  (checked 2026-11-04). Since flk c887f14, init tells the two apart and
+  falls back to root with a warning instead of dying at boot. The no-shell init switches users itself. A fix in flk is planned
   (`~/flk/TODO.md`, Machines); until it lands, keep the rule.
 - **Getting a shell**: `flk ssh console` and `flk exec CMD` reach a
   running machine through flk's agent over vsock. No sshd or network is
@@ -103,8 +103,7 @@ source is `~/flk/share/guide.md`, and the guides by stage are
   `[flk] http_port = N`. The first `internal_port` is what deploy waits
   for after boot.
 - **Health checks**: `[checks.NAME] type = "log"` (a Ruby regex for a
-  console line since boot; console lines end in `\r\r`, so don't end it
-  with `$`: BUGS.flk.md #2), `"tcp"` (port) or `"http"` (port, path). A deploy
+  console line since boot, matched line by line), `"tcp"` (port) or `"http"` (port, path). A deploy
   waits for all of them within `grace_period`, and a machine that fails
   goes back to its previous release. UDP-only servers use a log check.
 - **Backups**: `[flk.backup] mode` = `"stop"` (default), `"live"` (copy

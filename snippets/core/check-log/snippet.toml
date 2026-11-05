@@ -16,7 +16,7 @@ validate = '^[a-z0-9_-]+$'
 type = "regex"
 required = true
 prompt = "A regex for the line that means the app is ready"
-hint = "The same line as core/run-wrapper's ready, typically. A Ruby regex, matched against the console since boot: ^ works, but don't end it with $ (console lines end in \\r\\r; BUGS.flk.md #2)."
+hint = "The same line as core/run-wrapper's ready, typically. A Ruby regex, matched line by line against the console since boot: ^ and $ anchor the line."
 
 [params.grace]
 type = "duration"
@@ -43,6 +43,5 @@ It's the check for UDP-only servers, which have no TCP port to probe.
 """
 gotchas = [
   "A regex that also matches chat or an error message passes too early: anchor the start (^) on the line's exact shape.",
-  "Don't end it with $: the console's lines end in \\r\\r, so flk 0.1.0 never matches it (BUGS.flk.md #2).",
 ]
 docs = ["flk help --all  (Config: [checks.NAME])", "flk help deploy"]

@@ -3,16 +3,6 @@
 Open questions. Decide the ones marked (M0) before writing code that
 depends on them; ask the user when it's their call.
 
-## When flk's r1-reliability reaches main
-
-The flk session says when Dayne merges it. Then, and not before (the
-real apps and the boot service run main):
-- `core/check-http`: drop the "Gaps in flk" step (BUGS.flk.md #1, flk 4294558),
-  then redeploy the hello slice with the check as flkt-forge-hello.
-- Rule `log-check-dollar` and the check-log hint/gotcha about `$`
-  (BUGS.flk.md #2, flk a8461a0); the primer's line about it.
-- The primer's note on busybox setpriv crashing init (flk c887f14).
-
 ## Decisions
 
 - ~~(M0) Final `snippet.toml` field names~~: settled 2026-11-04 (SPEC 4).

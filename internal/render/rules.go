@@ -37,8 +37,6 @@ var Rules = []Rule{
 		"The before-deploy backup is for rolling back a release that failed its checks; without a check, no release fails."},
 	{"udp-only-check", "warn", "An app whose services are all UDP needs a log (or other) check.",
 		"Without checks, deploy waits for the first internal_port over TCP, which a UDP server never answers."},
-	{"log-check-dollar", "warn", "A log check's regex doesn't end in $.",
-		"flk 0.1.0 matches it against the raw console, whose lines end in \\r\\r, so $ never matches (BUGS.flk.md #2; fixed on flk's r1-reliability branch)."},
 	{"busybox-user", "error", "A non-root user on a busybox base needs util-linux's setpriv.",
 		"flk's init switches users with setpriv --reuid or chroot --userspec. Busybox's setpriv has no --reuid, so without the setpriv package init runs the app as root and only logs a warning."},
 	{"live-backup-console", "error", "A live backup with console hooks needs stdin = \"console\".",
@@ -146,18 +144,6 @@ func rules(uses []*use, base *use, app App, res *Result) []Finding {
 		if udpOnly {
 			add("udp-only-check", "every service is UDP and there's no check: deploy waits for a TCP port that never answers",
 				"add core/check-log with the server's ready line")
-		}
-	}
-
-	for _, name := range sortedKeys(checks) {
-		ct, _ := checks[name].(map[string]any)
-		if t, _ := ct["type"].(string); t != "log" {
-			continue
-		}
-		if m, _ := ct["match"].(string); strings.HasSuffix(m, "$") && !strings.HasSuffix(m, `\$`) {
-			add("log-check-dollar",
-				fmt.Sprintf("[checks.%s] match %q ends in $, but console lines end in \\r\\r: flk never matches it and the deploy fails its check", name, m),
-				"drop the $ (or end with \\r*$)")
 		}
 	}
 

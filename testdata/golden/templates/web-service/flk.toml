@@ -5,11 +5,12 @@ app = "flkt-template"
 [build]
   dockerfile = "Dockerfile"
 
-# A deploy waits for this port to accept connections; a machine that
-# doesn't within grace_period goes back to its previous release.
-[checks.tcp]
-  type = "tcp"
+# A deploy waits for this; a machine that fails it goes back to its
+# previous release.
+[checks.http]
+  type = "http"
   port = 8080
+  path = "/"
   grace_period = "30s"
 
 [[vm]]

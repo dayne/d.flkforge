@@ -39,13 +39,6 @@ text = '''
   grace_period = {{toml .P.grace}}
 '''
 
-# Fixed in flk 4294558 (branch r1-reliability). Remove this when that is
-# merged into main: the real apps and the boot service run main (BUGS.flk.md #1).
-[[next]]
-kind = "gap"
-text = "flk 0.1.0's deploy crashes on type = \"http\" checks (NameError: Flk::Net::HTTP)"
-why = "reported in flkforge's BUGS.flk.md #1; until it's fixed, drop this check (deploy then waits for internal_port)"
-
 [hints]
 what = "Adds an http check to [checks]: deploys wait for the path to answer."
 under_the_hood = """

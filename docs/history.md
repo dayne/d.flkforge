@@ -182,3 +182,14 @@ Acceptance (PLAN M3):
   workspace file were still there, not seeded again. Destroyed. It
   turned up a false "run flk-seed-home" step (the template already
   does), fixed with unless_found.
+
+## 2026-11-04: flk's r1-reliability on main
+
+Dayne merged it; checked in ~/flk that 4294558, a8461a0 and c887f14 are
+on main and that the installed flk runs that checkout. Removed the
+workarounds: check-http's "Gaps in flk" line, the log-check-dollar rule
+and its hints, the primer's notes. web-service now uses check-http.
+Confirmed: testdata/hello-checked.toml (hello plus an http check)
+deployed as flkt-forge-hello by the printed steps, and the deploy waited
+on the http check and passed (the machine logged 200s for it), where in
+M0 flk crashed. Destroyed.

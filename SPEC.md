@@ -301,7 +301,7 @@ These run after the merge, on the merged flk.toml as flk will read it
 render; `warn` and `hint` don't) and a fix. Built so far:
 `image-full-name`, `kill-timeout-max`, `kill-timeout-margin`,
 `wrapper-restart`, `before-deploy-check`, `udp-only-check`,
-`log-check-dollar` (BUGS.flk.md #2), `busybox-user`, `stdin-null-console`;
+`busybox-user`, `stdin-null-console`;
 `app-name-taken` comes from the host (`internal/forge`). M2 added
 `no-shell`, `live-backup-console`, `mount-owner`, `mount-hides`,
 `secret-in-env`, `private-key`, `guest-init` and `huge-pages`, and made

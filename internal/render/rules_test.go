@@ -47,8 +47,6 @@ func TestRules(t *testing.T) {
 		{"udp only, no check", ubuntu + "[[use]]\nsnippet = \"service\"\nparams = { port = 2456, protocol = \"udp\" }\n", "udp-only-check", true},
 		{"udp with a log check", ubuntu + "[[use]]\nsnippet = \"service\"\nparams = { port = 2456, protocol = \"udp\" }\n[[use]]\nsnippet = \"check-log\"\nparams = { match = \"up\" }\n", "udp-only-check", false},
 		{"tcp service", ubuntu + "[[use]]\nsnippet = \"service\"\nparams = { port = 25565 }\n", "udp-only-check", false},
-		{"log check ending in $", ubuntu + "[[use]]\nsnippet = \"check-log\"\nparams = { match = \"^ready$\" }\n", "log-check-dollar", true},
-		{"log check, escaped $", ubuntu + "[[use]]\nsnippet = \"check-log\"\nparams = { match = \"costs \\\\$\" }\n", "log-check-dollar", false},
 		{"alpine user gets setpriv", "[[use]]\nsnippet = \"base-alpine\"\n[[use]]\nsnippet = \"user-1000\"\n", "busybox-user", false},
 		{"stdin null, console stop", ubuntu + "[[use]]\nsnippet = \"run-wrapper\"\nparams = { command = [\"/srv\"], stop = \"console:stop\" }\n[[use]]\nsnippet = \"stdin-null\"\n", "stdin-null-console", true},
 	} {

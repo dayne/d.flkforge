@@ -48,7 +48,7 @@ pointing here. Without a check, a deploy waits for `internal_port`.
 
 **Asked:** fix the constant, and a test case with an http check.
 
-Status: fixed in flk 4294558 (branch r1-reliability, not on main yet): `::Net` in `check_passes?`, both the request and the rescue list (the rescue raised the same NameError). Test: `tests/cases/10-hello.sh` test_http_checks_gate_the_deploy (200 deploys, 500 fails the check and rolls back).
+Status: fixed in flk 4294558, on main since 2026-11-04; flkforge's gap line removed. Was: branch r1-reliability: `::Net` in `check_passes?`, both the request and the rescue list (the rescue raised the same NameError). Test: `tests/cases/10-hello.sh` test_http_checks_gate_the_deploy (200 deploys, 500 fails the check and rolls back).
 
 ## 2. Log checks never match a regex that ends in `$` (2026-11-04)
 
@@ -74,4 +74,4 @@ the check-log hint says not to use one.
 `tail.each_line.any? { _1.chomp.delete_suffix("\r")... }`, or strip `\r`
 before matching), or document it in `flk help --all` ([checks.NAME]).
 
-Status: fixed in flk a8461a0 (branch r1-reliability, not on main yet): `check_passes?` deletes "\r" before matching, like the reader behind `console --wait-log`, so `^...$` work per line. Documented under [checks.NAME]. Test: `tests/cases/05-cli.sh` test_log_check_regex_anchors (real "\r\r\n" line ends).
+Status: fixed in flk a8461a0, on main since 2026-11-04; flkforge's log-check-dollar rule removed. Was: branch r1-reliability: `check_passes?` deletes "\r" before matching, like the reader behind `console --wait-log`, so `^...$` work per line. Documented under [checks.NAME]. Test: `tests/cases/05-cli.sh` test_log_check_regex_anchors (real "\r\r\n" line ends).

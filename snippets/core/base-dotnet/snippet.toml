@@ -24,4 +24,4 @@ ubuntu user is uid 1000. The image comes from mcr.microsoft.com, written
 in full like every image flkforge writes.
 """
 gotchas = ["The runtime image has no SDK: build .NET code elsewhere, or in a stage of its own."]
-docs = ["flk help --all  (Machines)"]
+docs = ["flk help dockerfile", "flk help --all  (Machines)"]

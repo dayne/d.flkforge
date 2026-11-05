@@ -23,4 +23,4 @@ util-linux (setpriv), so flk's init can run the app as another user;
 there's no uid-1000 user until core/user-1000 creates one.
 """
 gotchas = ["slim images leave out man pages and some locales; add packages as needed (core/packages)."]
-docs = ["flk help --all  (Machines)"]
+docs = ["flk help dockerfile", "flk help --all  (Machines)"]

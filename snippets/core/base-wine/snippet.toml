@@ -50,4 +50,4 @@ gotchas = [
   "Wine leaves wineserver running after a kill: escalate_cmd = \"wineserver -k\".",
   "The prefix is per release, in the image: anything the server writes there is lost at the next deploy (point the server's save and config paths at the volume).",
 ]
-docs = ["flk help --all  (Machines: stopping)", "~/enshrouded.flk (the M1 notes)"]
+docs = ["flk help dockerfile", "flk help --all  (Machines: stopping)", "~/enshrouded.flk (the M1 notes)"]

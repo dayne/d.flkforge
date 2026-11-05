@@ -23,4 +23,4 @@ makes one). Set PYTHONUNBUFFERED=1 in [env] so print() reaches flk logs at
 once instead of in buffered blocks.
 """
 gotchas = ["pip's default torch wheel pulls gigabytes of CUDA libraries a VM can't use: core/pip has a CPU-only option."]
-docs = ["flk help --all  (Machines)"]
+docs = ["flk help dockerfile", "flk help --all  (Machines)"]

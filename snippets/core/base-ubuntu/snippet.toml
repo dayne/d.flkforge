@@ -29,4 +29,4 @@ gotchas = [
   "The image is minimal: no ca-certificates, curl or tzdata until you add them (core/packages).",
   "apt in a Dockerfile: flkforge writes one install line that also clears apt's lists, so the layer stays small.",
 ]
-docs = ["flk help --all  (Machines: the guest is a VM)", "flk help first-app"]
+docs = ["flk help dockerfile", "flk help --all  (Machines: the guest is a VM)", "flk help first-app"]

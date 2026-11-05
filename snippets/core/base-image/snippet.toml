@@ -59,4 +59,4 @@ gotchas = [
   "Container entrypoints that call gosu/su-exec, or expect a writable /run they create, may need clearing.",
   "Find the family with: podman run --rm IMAGE cat /etc/os-release.",
 ]
-docs = ["flk help --all  (Config: [build]; Machines)", "flk help first-app"]
+docs = ["flk help dockerfile", "flk help --all  (Config: [build]; Machines)", "flk help first-app"]

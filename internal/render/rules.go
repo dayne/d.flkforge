@@ -36,7 +36,7 @@ var Rules = []Rule{
 	{"before-deploy-check", "warn", "[flk.backup] before_deploy needs a health check.",
 		"The before-deploy backup is for rolling back a release that failed its checks; without a check, no release fails."},
 	{"udp-only-check", "warn", "An app whose services are all UDP needs a log (or other) check.",
-		"Without checks, deploy waits for the first internal_port over TCP, which a UDP server never answers."},
+		"flk can't tell when a UDP port is ready, so without a check a deploy never knows whether the server came up (and never rolls a broken release back)."},
 	{"busybox-user", "error", "A non-root user on a busybox base needs util-linux's setpriv.",
 		"flk's init switches users with setpriv --reuid or chroot --userspec. Busybox's setpriv has no --reuid, so without the setpriv package init runs the app as root and only logs a warning."},
 	{"live-backup-console", "error", "A live backup with console hooks needs stdin = \"console\".",
@@ -142,7 +142,7 @@ func rules(uses []*use, base *use, app App, res *Result) []Finding {
 			}
 		}
 		if udpOnly {
-			add("udp-only-check", "every service is UDP and there's no check: deploy waits for a TCP port that never answers",
+			add("udp-only-check", "every service is UDP and there's no check: flk can't tell when a UDP port is ready, so a deploy never knows if the server came up",
 				"add core/check-log with the server's ready line")
 		}
 	}

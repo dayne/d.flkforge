@@ -32,4 +32,4 @@ gotchas = [
   "Set -Xms and -Xmx explicitly: the JVM's default heap is a quarter of the VM's memory.",
   "Leave a GB or more above the heap for the JVM's own memory (metaspace, threads, GC).",
 ]
-docs = ["flk help --all  (Config: [[vm]])", "flk machine stats"]
+docs = ["flk help dockerfile", "flk help --all  (Config: [[vm]])", "flk machine stats"]

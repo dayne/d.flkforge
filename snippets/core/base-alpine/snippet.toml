@@ -30,4 +30,4 @@ gotchas = [
   "busybox has no setpriv or chroot --userspec: an app meant to run as a non-root USER silently runs as root unless the image has setpriv (flk's init needs it).",
   "musl, not glibc: prebuilt Linux binaries (game servers, many downloads) usually won't run here; use base-ubuntu or base-debian for those.",
 ]
-docs = ["flk help --all  (Machines: the guest is a VM)", "flk help first-app"]
+docs = ["flk help dockerfile", "flk help --all  (Machines: the guest is a VM)", "flk help first-app"]

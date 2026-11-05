@@ -193,3 +193,33 @@ Confirmed: testdata/hello-checked.toml (hello plus an http check)
 deployed as flkt-forge-hello by the printed steps, and the deploy waited
 on the http check and passed (the machine logged 200s for it), where in
 M0 flk crashed. Destroyed.
+
+## 2026-11-05: M4 done (the wizard)
+
+Built `internal/wizard` (SPEC 8.2): steps, forms with live re-rendering,
+a preview that marks the focused snippet's lines and follows it to its
+file, placeholders while params are missing, a picker where a
+conflicting snippet replaces the old one, review with flk's verdict and
+the app-name check, writing through forge with the four-part report,
+help, three hint levels, and layouts from 60x16 up. `flkforge new` in a
+terminal and `flkforge edit`. Hand-built widgets instead of huh (decided
+here; SPEC 8.2). Tests: golden snapshots of each screen at 80x24 and
+160x48, behaviour tests (quitting, focus, bad values, enums, base change,
+removal, help, multi-line params, taken names, every screen fits), and
+the acceptance flow driven by key presses.
+
+Acceptance (PLAN M4):
+- In the tests and again in a real terminal (tmux, the real binary):
+  pick steam-game, change the name (flkt-forge-steam / flkt-forge-tmux),
+  fill in the app id, the server command, the ports (2466, host 2476) and
+  the ready line, set a backup setting (keep = 5), write. flkforge check:
+  0 FAIL (warnings: the two hook stubs, not registered yet). Then
+  `flkforge edit`, swap backup-pause for backup-stop on Backups, write:
+  the diff of flk.toml is the backup comment and `mode = "pause"` ->
+  `"stop"`, keep = 5 carried over; Dockerfile and flk-run unchanged.
+- Screens captured from tmux at 80x24 and 160x48: docs/screens/.
+- Found by driving it in tmux, and fixed: the Write button fell below the
+  form at 80x24 on Review (it's first now); entering a step now focuses
+  the first missing param (counting rows by hand was error-prone, so it
+  would be for people too); long directories in the header and the
+  button; the preview column was too narrow at 160.

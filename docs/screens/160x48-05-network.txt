@@ -1,0 +1,48 @@
+ flkforge new · flkt-forge-steam · …3bf-8688-9086fc354ccf/scratchpad/screens2-160x48.flk                                                         ✗ 1 to fill in
+ Steps               Network  ports                                         │  Dockerfile  flk.toml  flk-run  flk-run.d/prestart  flk-run.d/watch   TODO: to fi…
+                                                                            │    RESTART_DELAY = "10"    # seconds before restarting after a crash
+   1 Start            ■ service  Service port                               │    MAX_RESTARTS = "5"      # give up after this many restarts...
+   2 Name           ›   port       2466                                     │    RESTART_WINDOW = "600"  # ...within this many seconds
+   3 Base               protocol   udp                                      │
+   4 Software           host_port  (optional)                               │  # The run wrapper restarts the server itself and gives up on a crash loop
+   5 Process            comment    (optional)                               │  # (exits 1). flk's restart policy is only the outer net: restart the VM
+   6 User & data      + add a port or network snippet…                      │  # once, then leave it stopped for a human.
+ › 7 Network                                                                │  [[restart]]
+!  8 Health                                                                 │    policy = "on-failure"
+   9 Backups                                                                │    retries = 1
+  10 Resources                                                              │
+  11 Env & secrets                                                          │  [flk]
+  12 Review                                                                 │    keep_releases = 3  # images kept for flk releases rollback (default 2)
+                                                                            │    stdin = "null"     # the app has no console input
+ ctrl+n next                                                                │
+ ctrl+p back                                                                │  # Backups freeze the VM for the copy (a second or two): the copy holds what
+                                                                            │  # was on disk, like after a power cut. Fine for apps that write atomically
+                                                                            │  # or journal; nobody is disconnected.
+                                                                            │  [flk.backup]
+                                                                            │    mode = "pause"
+                                                                            │    before_deploy = true
+                                                                            │
+                                                                            │  # A deploy waits for this line on the console; a machine that doesn't log
+                                                                            │  # it within grace_period goes back to its previous release.
+                                                                            │  [checks.ready]
+                                                                            │    type = "log"
+                                                                            │    match = "TODO"
+                                                                            │    grace_period = "5m"
+                                                                            │
+                                                                            │  [[vm]]
+                                                                            │    cpus = 2
+                                                                            │    memory = "4gb"
+                                                                            │
+                                                                            │  [[mounts]]
+                                                                            │    source = "data"
+                                                                            │    destination = "/data"
+                                                                            │
+                                                                            │ ▌[[services]]
+                                                                            │ ▌  internal_port = 2466
+                                                                            │ ▌  protocol = "udp"
+                                                                            │ ▌  [[services.ports]]
+                                                                            │ ▌    port = 2466
+─ hint ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ service.port (port, required): The port the server listens on inside the VM
+ Adds a [[services]] entry: flk forwards the host port to the VM's port.
+ tab/↑↓ move · ctrl+n/ctrl+p step · ctrl+d remove · ctrl+f file · ctrl+t hints · F1 help · esc quit

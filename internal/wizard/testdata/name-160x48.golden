@@ -1,0 +1,48 @@
+ flkforge new · mygame-flk · /tmp/mygame.flk                                                                                                     ✗ 4 to fill in 
+ Steps               Name  the app's name                                   │  Dockerfile  flk.toml  flk-run  flk-run.d/prestart  flk-run.d/watch   TODO: to fi…
+                                                                            │  # mygame-flk: made by flkforge from flkforge.toml. Change the recipe and run     
+   1 Start          › app name  mygame-flk                                  │  # `flkforge render`, or edit this file and stop using flkforge for it.           
+ › 2 Name                                                                   │  #                                                                                
+   3 Base                                                                   │  # The server is Steam app 1, downloaded by steamcmd in its own stage             
+!  4 Software                                                               │  # and pinned by STEAM_BUILDID ([build] args in flk.toml). Steam serves only      
+!  5 Process                                                                │  # its current build, so the build fails once Steam has moved past the pin;       
+   6 User & data                                                            │  # old builds come back only from kept release images (flk releases rollback).    
+!  7 Network                                                                │  #                                                                                
+!  8 Health                                                                 │  # On the data volume, at /data: what must survive a deploy.                      
+   9 Backups                                                                │                                                                                   
+  10 Resources                                                              │  # --- download the server with steamcmd -----------------------------------------
+  11 Env & secrets                                                          │  FROM docker.io/steamcmd/steamcmd:ubuntu-24 AS steam                              
+  12 Review                                                                 │  ARG STEAM_BUILDID=latest                                                         
+                                                                            │  RUN for try in 1 2 3; do \                                                       
+ ctrl+n next                                                                │        steamcmd +force_install_dir /server +login anonymous +app_update 1 validat…
+ ctrl+p back                                                                │        echo "steamcmd failed (try $try)"; sleep 5; \                              
+                                                                            │      done \                                                                       
+                                                                            │   && got=$(sed -n 's/^[[:space:]]*"buildid"[[:space:]]*"\([0-9]*\)".*/\1/p' /serv…
+                                                                            │   && echo "$got" > /server/BUILDID \                                              
+                                                                            │   && echo "Steam build $got (pinned: $STEAM_BUILDID)" \                           
+                                                                            │   && if [ "$STEAM_BUILDID" != latest ] && [ "$STEAM_BUILDID" != "$got" ]; then \  
+                                                                            │        echo "ERROR: Steam served build $got but flk.toml pins $STEAM_BUILDID: set…
+                                                                            │      fi \                                                                         
+                                                                            │   && rm -rf /server/steamapps/downloading /server/steamapps/temp                  
+                                                                            │                                                                                   
+                                                                            │  FROM docker.io/library/ubuntu:24.04                                              
+                                                                            │                                                                                   
+                                                                            │  RUN apt-get update \                                                             
+                                                                            │   && apt-get install -y --no-install-recommends ca-certificates tzdata \          
+                                                                            │   && rm -rf /var/lib/apt/lists/*                                                  
+                                                                            │                                                                                   
+                                                                            │  COPY --from=steam /server /server                                                
+                                                                            │                                                                                   
+                                                                            │  # The run engine (flkforge's core/run-wrapper) and its hooks. Late in the        
+                                                                            │  # file, so changing them doesn't rebuild the layers above.                       
+                                                                            │  COPY flk-run /usr/local/bin/flk-run                                              
+                                                                            │  COPY flk-run.d/ /usr/local/lib/flk-run/                                          
+                                                                            │                                                                                   
+                                                                            │  # The mount point, owned by the app's user, so the volume's root takes           
+                                                                            │  # that owner the first time it's mounted.                                        
+                                                                            │  RUN install -d -o ubuntu -g ubuntu /data                                         
+                                                                            │                                                                                   
+─ hint ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ App name: lowercase letters, digits and dashes (flk's rule). Start experiments with flkt- so they're easy to tell from real apps.                              
+ The machines' names are flk's to make up. The directory: /tmp/mygame.flk                                                                                       
+ started from core/steam-game                                                                                                                                   

@@ -535,10 +535,52 @@ ID` shows one. Before adding an entry, check `flk help --all` and
 `~/flk/PLAN.md`, because flk changes. The `version` and `schema` from
 `flk help --all --json` say which flk the entry was checked against.
 
-Keys follow lazyflk where they overlap (`?` help, `q`/`esc`, tab). `h`
-cycles the hint detail level (summary → under the hood → off), and
-`--hints=summary|full|off` sets the starting level. The mouse is optional.
-Works at 80 columns: the preview drops below the form when narrow.
+### 8.2 As built (M4, 2026-11-05)
+
+`internal/wizard`, on bubbletea v2 and lipgloss v2, with its own small
+widgets (a one-line text field, choices that cycle, yes/no) rather than
+huh: huh wants to own the whole flow, and the wizard needs three panes
+re-rendered on every keystroke and screens deterministic enough for
+golden tests (lazyflk's way). Decided 2026-11-05; huh isn't a dependency.
+
+- Steps: Start (templates; `new` only), Name, Base, Software, Process,
+  User & data, Network, Health, Backups, Resources, Env & secrets,
+  Review. A category step lists the recipe's uses of its categories, each
+  with its params as fields, and "+ add…", which opens a picker of that
+  step's snippets. A snippet that conflicts with one already there
+  replaces it, keeping the params they share (backup-pause → backup-stop
+  in one pick); a new base replaces the old. Entering a step focuses the
+  first param that still needs a value; steps with one are marked `!`.
+- Live: every keystroke renders the recipe with the same pure renderer
+  as the CLI. While required params are missing, the preview renders
+  with placeholders (marked `TODO: to fill in`) so it always shows the
+  files. The focused use's lines are marked `▌` (it's rendered again
+  without that use, and the difference marked), and the preview follows
+  it to the first file it changes.
+- Multi-line params (a start script's body) aren't edited in a one-line
+  field: they say so, and the file is the admin's after writing.
+- Review: the Write button first, then the files, the rules' findings,
+  `flk config show`'s verdict (run in the background), whether the app
+  name is already registered, the flk commands to run and the to-dos.
+  Writing goes through forge (new: `forge.New`; edit: `forge.Render`,
+  drift refusal included) and shows the four-part report, which is
+  printed again after the wizard exits.
+- Keys: tab/↓ and shift+tab/↑ move; ctrl+n/ctrl+p (pgdown/pgup; `]`/`[`
+  outside a text field) change step; typing edits, ctrl+u clears; ←/→
+  or space change a choice; ctrl+d removes the focused snippet; ctrl+f
+  cycles the preview's file; ctrl+t cycles the hints (full, summary,
+  minimal: never hidden); F1 or `?` (outside a text field) is help; esc
+  or ctrl+c quits, twice when nothing is written yet. Letters can't be
+  commands while a text field has focus, hence the ctrl keys (the
+  sketch's `h` and tab).
+- Layout: from 120 columns, steps | form | preview side by side with the
+  hint panel below; under 120, a step bar, the form, the preview below
+  it, then the hints. Every screen fills the terminal exactly (tested
+  from 60x16 to 200x60). No mouse yet.
+- `flkforge new` in a terminal without `--yes` is the wizard (with
+  `--template` or `--recipe` it starts from that); `flkforge edit [DIR]`
+  opens an existing recipe. Without a terminal both refuse and name the
+  CLI form. `--hints full|summary|minimal` sets the starting level.
 
 ## 9. CLI
 
@@ -631,3 +673,5 @@ recipe's `[[vm]]` gives; fly.io deployment.
   on next steps, the escape hatches (3), templated Dockerfile slots,
   `kill_margin` on run-wrapper, rule `jvm-heap`. `sshd` is deferred
   (TODO.md).
+- 2026-11-05 (M4): the wizard as built (8.2): hand-built widgets instead
+  of huh, ctrl-key bindings, placeholders in the preview, replace-on-add.

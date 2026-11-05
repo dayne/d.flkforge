@@ -1,0 +1,24 @@
+ flkforge new · flkt-forge-steam · …tchpad/screens2-80x24.flk         ✓ renders
+ Step 8/12: Health   ‹ Network   Backups ›
+ Health  what a deploy waits for
+
+  ■ check-log  Log health check
+    name   default: ready
+›   match  Game server connected
+    grace  5m
+  + add a health check…
+
+ Dockerfile  flk.toml  flk-run  flk-run.d/prestart  flk-run.d/watch   ctrl+f
+   before_deploy = true
+
+▌# A deploy waits for this line on the console; a machine that doesn't log
+▌# it within grace_period goes back to its previous release.
+▌[checks.ready]
+▌  type = "log"
+─ hint ─────────────────────────────────────────────────────────────────────────
+ check-log.match (regex, required): A regex for the line that means the app is
+ ready
+ The same line as core/run-wrapper's ready, typically. A Ruby regex, matched
+ line by line against the console since boot: ^ and $ anchor the line.
+ Adds a log check: deploys wait for the app's ready line.
+ tab/↑↓ move · ctrl+n/ctrl+p step · ctrl+d remove · ctrl+f file · ctrl+t hints …

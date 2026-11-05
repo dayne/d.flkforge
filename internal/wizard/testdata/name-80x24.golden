@@ -1,0 +1,24 @@
+ flkforge new · mygame-flk · /tmp/mygame.flk                     ✗ 4 to fill in 
+ Step 2/12: Name   ‹ Start   Base ›   ! Software, Process, Network, Health      
+ Name  the app's name                                                           
+                                                                                
+› app name  mygame-flk                                                          
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+ Dockerfile  flk.toml  flk-run  flk-run.d/prestart  flk-run.d/watch   TODO: to …
+ # mygame-flk: made by flkforge from flkforge.toml. Change the recipe and run   
+ # `flkforge render`, or edit this file and stop using flkforge for it.         
+ #                                                                              
+ # The server is Steam app 1, downloaded by steamcmd in its own stage           
+ # and pinned by STEAM_BUILDID ([build] args in flk.toml). Steam serves only    
+ # its current build, so the build fails once Steam has moved past the pin;     
+ # old builds come back only from kept release images (flk releases rollback).  
+─ hint ─────────────────────────────────────────────────────────────────────────
+ App name: lowercase letters, digits and dashes (flk's rule). Start experiments 
+ with flkt- so they're easy to tell from real apps.                             
+ The machines' names are flk's to make up. The directory: /tmp/mygame.flk       
+ started from core/steam-game                                                   

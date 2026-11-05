@@ -3,11 +3,11 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 
-	"github.com/dayne/d.flkforge/internal/flktoml"
 	"github.com/dayne/d.flkforge/internal/forge"
 	"github.com/dayne/d.flkforge/internal/recipe"
 	"github.com/dayne/d.flkforge/internal/render"
@@ -22,17 +22,36 @@ func cmdNew(c *ctx) int {
 	if c.has("recipe") && c.has("template") {
 		return c.usageError("--recipe or --template, not both")
 	}
-	if !c.has("recipe") && !c.has("template") {
-		if !c.isTTY() {
-			return c.usageError("no terminal, and the wizard needs one. Without a terminal: " + agentForm)
-		}
-		return c.usageError("the wizard isn't built yet (PLAN M4). For now: " + agentForm)
-	}
 	if !c.has("yes") {
 		if !c.isTTY() {
+			if !c.has("recipe") && !c.has("template") {
+				return c.usageError("no terminal, and the wizard needs one. Without a terminal: " + agentForm)
+			}
 			return c.usageError("no terminal to confirm in: add --yes (" + agentForm + ")")
 		}
-		return c.usageError("the wizard, which would show the recipe before writing, isn't built yet: add --yes")
+		if len(c.multi["set"]) > 0 {
+			return c.usageError("--set goes with --yes; in the wizard, set params in their step")
+		}
+		if err := c.checkNewDir(dir); err != nil {
+			return c.errorf("%v", err)
+		}
+		var r *recipe.Recipe
+		if c.has("recipe") {
+			var err error
+			if r, err = recipe.Read(c.opt("recipe")); err != nil {
+				return c.errorf("%v", err)
+			}
+			r.Render, r.Seeded = nil, nil
+			if c.has("app") {
+				r.App = c.opt("app")
+			}
+		} else if c.has("app") {
+			r = &recipe.Recipe{App: c.opt("app")}
+		}
+		return c.runWizard(dir, r, c.opt("template"), false)
+	}
+	if !c.has("recipe") && !c.has("template") {
+		return c.usageError("--yes needs --template T or --recipe FILE (" + agentForm + ")")
 	}
 	cat, err := c.env().Catalog(dir)
 	if err != nil {
@@ -232,7 +251,7 @@ func setParam(r *recipe.Recipe, cat *source.Catalog, key, param, raw string) err
 	if !ok {
 		return fmt.Errorf("%s has no param %q (it has: %s)", s.ID, param, strings.Join(s.ParamOrder, ", "))
 	}
-	v, err := parseValue(p, raw)
+	v, err := snippet.ParseValue(p, raw)
 	if err != nil {
 		return fmt.Errorf("%s.%s: %v", key, param, err)
 	}
@@ -246,58 +265,18 @@ func setParam(r *recipe.Recipe, cat *source.Catalog, key, param, raw string) err
 	return nil
 }
 
-// parseValue reads a command-line value for a param: strings as they are
-// (or TOML-quoted), numbers and booleans by type, lists as TOML arrays or
-// comma-separated, maps as TOML inline tables.
-func parseValue(p *snippet.Param, raw string) (any, error) {
-	switch p.Type {
-	case "int", "port":
-		n, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("%q isn't a whole number", raw)
-		}
-		return n, nil
-	case "bool":
-		b, err := strconv.ParseBool(raw)
-		if err != nil {
-			return nil, fmt.Errorf("%q isn't true or false", raw)
-		}
-		return b, nil
-	case "duration":
-		if n, err := strconv.ParseInt(raw, 10, 64); err == nil {
-			return n, nil
-		}
-		return raw, nil
-	case "list":
-		if strings.HasPrefix(strings.TrimSpace(raw), "[") {
-			v, err := flktoml.Decode(raw)
-			if err != nil {
-				return nil, err
-			}
-			return v, nil
-		}
-		if raw == "" {
-			return []any{}, nil
-		}
-		var out []any
-		for _, s := range strings.Split(raw, ",") {
-			out = append(out, strings.TrimSpace(s))
-		}
-		return out, nil
-	case "map":
-		v, err := flktoml.Decode(raw)
-		if err != nil {
-			return nil, fmt.Errorf("want a TOML inline table, such as '{ NAME = \"value\" }': %v", err)
-		}
-		return v, nil
+// checkNewDir refuses a directory that already has an app, before the
+// wizard starts (forge.New checks again when it writes).
+func (c *ctx) checkNewDir(dir string) error {
+	if _, err := os.Stat(filepath.Join(dir, recipe.File)); err == nil {
+		return fmt.Errorf("%s already has a recipe: flkforge edit %s", dir, dir)
 	}
-	// strings: a TOML-quoted one is unquoted, anything else is taken as is
-	if len(raw) >= 2 && (raw[0] == '"' || raw[0] == '\'') {
-		if v, err := flktoml.Decode(raw); err == nil {
-			if s, ok := v.(string); ok {
-				return s, nil
+	if !c.has("force") {
+		for _, f := range []string{"Dockerfile", "flk.toml", "fly.toml"} {
+			if _, err := os.Stat(filepath.Join(dir, f)); err == nil {
+				return fmt.Errorf("%s already has a %s: pick an empty directory, or --force to write next to it", dir, f)
 			}
 		}
 	}
-	return raw, nil
+	return nil
 }

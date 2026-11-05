@@ -1,0 +1,48 @@
+ flkforge new · flkt-forge-steam · …3bf-8688-9086fc354ccf/scratchpad/screens2-160x48.flk                                                              ✓ renders
+ Steps               Backups  how a backup keeps it from writing            │  Dockerfile  flk.toml  flk-run  flk-run.d/prestart  flk-run.d/watch   ctrl+f
+                                                                            │  # flkt-forge-steam: made by flkforge from flkforge.toml. Change the recipe and r…
+   1 Start            ■ backup-pause  Backups: pause the VM                 │  # `flkforge render`, or edit this file and stop using flkforge for it.
+   2 Name           ›   verify                                              │  app = "flkt-forge-steam"
+   3 Base               keep           (optional)                           │
+   4 Software         ■ before-deploy  Back up before each deploy           │  # flk-run stops the server cleanly within stop_timeout (90s); give it
+   5 Process            keep_releases  default: 3                           │  # that, plus a margin, before flk kills the VM.
+   6 User & data      + add a backup snippet…                               │  kill_timeout = 120
+   7 Network                                                                │
+   8 Health                                                                 │  [build]
+ › 9 Backups                                                                │    dockerfile = "Dockerfile"
+  10 Resources                                                              │
+  11 Env & secrets                                                          │    # The Steam build this release runs. Bump it to upgrade.
+  12 Review                                                                 │    args = { STEAM_BUILDID = "latest" }
+                                                                            │
+ ctrl+n next                                                                │  [env]
+ ctrl+p back                                                                │    # flk-run, the run engine (see flk-run for details)
+                                                                            │    RUN_STOP = "signal:INT"
+                                                                            │    STOP_TIMEOUT = "90"     # then SIGTERM (< kill_timeout)
+                                                                            │    RESTART_DELAY = "10"    # seconds before restarting after a crash
+                                                                            │    MAX_RESTARTS = "5"      # give up after this many restarts...
+                                                                            │    RESTART_WINDOW = "600"  # ...within this many seconds
+                                                                            │
+                                                                            │  # The run wrapper restarts the server itself and gives up on a crash loop
+                                                                            │  # (exits 1). flk's restart policy is only the outer net: restart the VM
+                                                                            │  # once, then leave it stopped for a human.
+                                                                            │  [[restart]]
+                                                                            │    policy = "on-failure"
+                                                                            │    retries = 1
+                                                                            │
+                                                                            │  [flk]
+                                                                            │    keep_releases = 3  # images kept for flk releases rollback (default 2)
+                                                                            │    stdin = "null"     # the app has no console input
+                                                                            │
+                                                                            │ ▌# Backups freeze the VM for the copy (a second or two): the copy holds what
+                                                                            │ ▌# was on disk, like after a power cut. Fine for apps that write atomically
+                                                                            │ ▌# or journal; nobody is disconnected.
+                                                                            │  [flk.backup]
+                                                                            │ ▌  mode = "pause"
+                                                                            │    before_deploy = true
+                                                                            │
+                                                                            │  # A deploy waits for this line on the console; a machine that doesn't log
+                                                                            │  # it within grace_period goes back to its previous release.
+─ hint ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ backup-pause.verify (string): A host command that checks a backup (optional; gets FLK_BACKUP)
+ Sets [flk.backup] mode = "pause".
+ tab/↑↓ move · ctrl+n/ctrl+p step · ctrl+d remove · ctrl+f file · ctrl+t hints · F1 help · esc quit

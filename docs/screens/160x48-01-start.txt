@@ -1,0 +1,48 @@
+ flkforge new · screens2-160x48-flk · …3bf-8688-9086fc354ccf/scratchpad/screens2-160x48.flk                                                    ✗ doesn't render
+ Steps               Start  a template to start from                        │ Preview
+                                                                            │
+ › 1 Start          › ○ blank  Blank                                        │ Nothing to show until it renders: no base snippet: add one (flkforge snippets
+   2 Name             ○ daemon  Daemon                                      │ --category base)
+   3 Base             ○ dev-sandbox  Dev sandbox                            │
+   4 Software         ○ dotnet-server  .NET game server                     │
+   5 Process          ○ java-server  Java game server                       │
+   6 User & data      ○ python-workbench  Python workbench                  │
+   7 Network          ○ steam-game  Steam game server                       │
+   8 Health           ○ steam-game-windows  Steam game server (Windows, und…│
+   9 Backups          ○ web-service  Web service                            │
+  10 Resources                                                              │
+  11 Env & secrets                                                          │
+  12 Review                                                                 │
+                                                                            │
+ ctrl+n next                                                                │
+ ctrl+p back                                                                │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+                                                                            │
+─ hint ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ core/blank: A base image and nothing else: add snippets with flkforge add.
+ Snippets: base-ubuntu. enter starts from it; the next steps change anything.
+ tab/↑↓ move · ctrl+n/ctrl+p step · ctrl+d remove · ctrl+f file · ctrl+t hints · F1 help · esc quit

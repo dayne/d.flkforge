@@ -398,3 +398,14 @@ func editedSteps(dir string, res *render.Result, steps []render.Step) []render.S
 	}
 	return keep
 }
+
+// ValidateFlkToml runs flk config show on a flk.toml in a scratch
+// directory and returns its warnings (for the wizard's review step).
+func (e *Env) ValidateFlkToml(content []byte) ([]string, error) {
+	out := &Outcome{}
+	e.validate(out, content)
+	if !out.FlkChecked {
+		return nil, fmt.Errorf("%s", out.FlkNote)
+	}
+	return out.FlkWarnings, nil
+}

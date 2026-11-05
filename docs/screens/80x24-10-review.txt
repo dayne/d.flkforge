@@ -1,0 +1,24 @@
+ flkforge new · flkt-forge-steam · …tchpad/screens2-80x24.flk         ✓ renders
+ Step 12/12: Review   ‹ Env & secrets
+ Review  the result, then write
+
+› [ Write the files to …f/scratchpad/screens2-80x24.flk ]
+
+ Files: Dockerfile, flk.toml, flk-run, flk-run.d/prestart (yours), flk-run.d/wa…
+ Rules: no findings
+ flk config show: no warnings
+ Then: flk launch --no-deploy; flk volumes create data --size 1; flk deploy
+ To do: The Steam build isn't pinned (build_id = latest)
+ Dockerfile  flk.toml  flk-run  flk-run.d/prestart  flk-run.d/watch   ctrl+f
+ # flkt-forge-steam: made by flkforge from flkforge.toml. Change the recipe and…
+ # `flkforge render`, or edit this file and stop using flkforge for it.
+ #
+ # The server is Steam app 896660, downloaded by steamcmd in its own stage
+ # and pinned by STEAM_BUILDID ([build] args in flk.toml). Steam serves only
+ # its current build, so the build fails once Steam has moved past the pin;
+ # old builds come back only from kept release images (flk releases rollback).
+ #
+─ hint ─────────────────────────────────────────────────────────────────────────
+ Write: the Dockerfile, flk.toml, the files the snippets add, and flkforge.toml
+ (the recipe). Nothing is deployed: the report lists the flk commands to run.
+ tab/↑↓ move · ctrl+n/ctrl+p step · ctrl+d remove · ctrl+f file · ctrl+t hints …

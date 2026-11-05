@@ -8,11 +8,13 @@ game servers, the MQTT broker) share the same hard-won patterns: a pinned
 build, a run wrapper that turns flk's stop into a clean save, a volume
 owned by the right user, health checks a deploy waits for, and a backup
 mode that suits the app. flkforge turns those patterns into **snippets**
-you pick in a wizard, and it explains each one as you go: which lines it
+you pick in a wizard (or from the command line), and it explains each one as you go: which lines it
 adds, what flk does with them at build, boot, stop and backup time, and
 what to watch out for.
 
-    flkforge templates             # starting points: daemon, steam-game, web-service, blank
+    flkforge new mygame.flk        # the wizard: pick a template, fill in the steps, watch the files build up
+    flkforge edit mygame.flk       # reopen the recipe in the wizard and remix it
+    flkforge templates             # starting points: daemon, steam-game, web-service, blank...
     flkforge new myserver --template daemon --yes --set service.port=6390 ...
     flkforge add secret --set name=API_TOKEN     # remix: add, set, rm a snippet, then render
     flkforge render                # rewrite the files from flkforge.toml
@@ -37,11 +39,10 @@ commands to run next (`flk launch --no-deploy`, `flk volumes create ...`,
 Later: a **hub** of shared snippets and whole-app recipes
 (`flkforge hub search valheim`).
 
-Status: M3 (2026-11-04). The command line is complete for agents and
-scripts, with the full catalog: 52 snippets and 9 templates (daemon,
-web-service, steam-game, steam-game-windows, java-server, dotnet-server,
-python-workbench, dev-sandbox, blank), all learned from the apps on this
-host. The wizard (`new` and `edit` in a terminal) is next: `PLAN.md`.
+Status: M4 (2026-11-05). The wizard (`new` and `edit` in a terminal),
+the command line for agents and scripts, flk-run, and a catalog of 52
+snippets and 9 templates learned from the apps on this host. Screens:
+`docs/screens/`. What's next: `PLAN.md` (Later) and `TODO.md`.
 
     make install                   # ~/.local/bin/flkforge
     flkforge new ~/myapp.flk --recipe testdata/hello.toml --yes --app flkt-myapp

@@ -51,7 +51,7 @@ var commands []*Command
 func init() {
 	commands = []*Command{
 		{Name: "new", Args: "[DIR]", run: cmdNew, JSON: true,
-			Summary: "Start a new app in DIR (default .) from a template or a recipe; the wizard comes later",
+			Summary: "Start a new app in DIR (default .): the wizard in a terminal, or --template/--recipe with --yes",
 			Opts: []Opt{
 				{Name: "template", Arg: "T", Help: "Start from this template (flkforge templates lists them)"},
 				{Name: "recipe", Arg: "FILE", Help: "Start from this recipe (a flkforge.toml)"},
@@ -60,13 +60,22 @@ func init() {
 				{Name: "yes", Help: "Write without asking (needed without a terminal)"},
 				{Name: "force", Help: "DIR already has a Dockerfile or flk.toml: write next to them (they're never overwritten)"},
 				{Name: "allow-warnings", Help: "Write even if flk config show warns about the new flk.toml"},
+				{Name: "hints", Arg: "LEVEL", Help: "The wizard's starting hint level: full (default), summary or minimal"},
 				jsonOpt,
 			},
 			Notes: []string{
+				"In a terminal without --yes it's the wizard: pick a template (or start from --template / --recipe), go through the steps with a live preview, and write.",
 				"The agent path: flkforge new DIR --template T --yes [--set USE.PARAM=VALUE ...] [--app NAME], or --recipe FILE instead of --template.",
 				"A use's id is its snippet's name (service, volume) unless the recipe gives it one. A template's open params are errors that name the --set to add.",
 				"Writes Dockerfile, flk.toml, any files the snippets add, and DIR/flkforge.toml (the recipe, with hashes of what it wrote).",
 				"Never deploys and never runs root steps: it ends with the flk commands to run.",
+			}},
+		{Name: "edit", Args: "[DIR]", run: cmdEdit,
+			Summary: "Open DIR's recipe in the wizard, remix it, and write",
+			Opts:    []Opt{{Name: "hints", Arg: "LEVEL", Help: "Starting hint level: full (default), summary or minimal"}},
+			Notes: []string{
+				"Needs a terminal. Without one: flkforge add, set and rm.",
+				"Writing re-renders like flkforge render: a file changed by hand isn't overwritten (FILE.flkforge-new instead).",
 			}},
 		{Name: "render", Args: "[DIR]", run: cmdRender, JSON: true,
 			Summary: "Rewrite the app's files from DIR/flkforge.toml",

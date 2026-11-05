@@ -1,0 +1,48 @@
+ flkforge new · flkt-forge-steam · …3bf-8688-9086fc354ccf/scratchpad/screens2-160x48.flk                                                         ✗ 3 to fill in
+ Steps               Software  how the program gets in                      │  Dockerfile  flk.toml  flk-run  flk-run.d/prestart  flk-run.d/watch   TODO: to fi…
+                                                                            │  # flkt-forge-steam: made by flkforge from flkforge.toml. Change the recipe and r…
+   1 Start            ■ packages  Extra packages                            │  # `flkforge render`, or edit this file and stop using flkforge for it.
+   2 Name               list          ca-certificates, tzdata               │  #
+   3 Base             ■ steamcmd  Steam dedicated server (steamcmd)         │ ▌# The server is Steam app 896660, downloaded by steamcmd in its own stage
+ › 4 Software       ›   app_id        896660                                │ ▌# and pinned by STEAM_BUILDID ([build] args in flk.toml). Steam serves only
+!  5 Process            build_id      default: latest                       │ ▌# its current build, so the build fails once Steam has moved past the pin;
+   6 User & data        platform      default: linux                        │ ▌# old builds come back only from kept release images (flk releases rollback).
+!  7 Network            dir           default: /server                      │ ▌#
+!  8 Health             single_stage  default: false                        │  # On the data volume, at /data: what must survive a deploy.
+   9 Backups            check_file    (optional)                            │
+  10 Resources        + add a way to get software in…                       │ ▌# --- download the server with steamcmd -----------------------------------------
+  11 Env & secrets                                                          │ ▌FROM docker.io/steamcmd/steamcmd:ubuntu-24 AS steam
+  12 Review                                                                 │ ▌ARG STEAM_BUILDID=latest
+                                                                            │ ▌RUN for try in 1 2 3; do \
+ ctrl+n next                                                                │ ▌      steamcmd +force_install_dir /server +login anonymous +app_update 896660 va…
+ ctrl+p back                                                                │ ▌      echo "steamcmd failed (try $try)"; sleep 5; \
+                                                                            │ ▌    done \
+                                                                            │ ▌ && got=$(sed -n 's/^[[:space:]]*"buildid"[[:space:]]*"\([0-9]*\)".*/\1/p' /serv…
+                                                                            │ ▌ && echo "$got" > /server/BUILDID \
+                                                                            │ ▌ && echo "Steam build $got (pinned: $STEAM_BUILDID)" \
+                                                                            │ ▌ && if [ "$STEAM_BUILDID" != latest ] && [ "$STEAM_BUILDID" != "$got" ]; then \
+                                                                            │ ▌      echo "ERROR: Steam served build $got but flk.toml pins $STEAM_BUILDID: set…
+                                                                            │ ▌    fi \
+                                                                            │ ▌ && rm -rf /server/steamapps/downloading /server/steamapps/temp
+                                                                            │ ▌
+                                                                            │  FROM docker.io/library/ubuntu:24.04
+                                                                            │
+                                                                            │  RUN apt-get update \
+                                                                            │   && apt-get install -y --no-install-recommends ca-certificates tzdata \
+                                                                            │   && rm -rf /var/lib/apt/lists/*
+                                                                            │
+                                                                            │ ▌COPY --from=steam /server /server
+                                                                            │ ▌
+                                                                            │  # The run engine (flkforge's core/run-wrapper) and its hooks. Late in the
+                                                                            │  # file, so changing them doesn't rebuild the layers above.
+                                                                            │  COPY flk-run /usr/local/bin/flk-run
+                                                                            │  COPY flk-run.d/ /usr/local/lib/flk-run/
+                                                                            │
+                                                                            │  # The mount point, owned by the app's user, so the volume's root takes
+                                                                            │  # that owner the first time it's mounted.
+                                                                            │  RUN install -d -o ubuntu -g ubuntu /data
+─ hint ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ steamcmd.app_id (int, required): Steam app id of the dedicated server
+ The server's own app id, not the game's: Valheim's is 896660. Search steamdb.info for 'dedicated server'.
+ Downloads the server with steamcmd in a build stage and copies it into the image, pinned to a Steam build.
+ tab/↑↓ move · ctrl+n/ctrl+p step · ctrl+d remove · ctrl+f file · ctrl+t hints · F1 help · esc quit

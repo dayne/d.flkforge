@@ -1,0 +1,24 @@
+ flkforge new · screens2-80x24-flk · …tchpad/screens2-80x24.flk   ✗ doesn't ren…
+ Step 1/12: Start   Name ›
+ Start  a template to start from
+
+› ○ blank  Blank
+  ○ daemon  Daemon
+  ○ dev-sandbox  Dev sandbox
+  ○ dotnet-server  .NET game server
+  ○ java-server  Java game server
+  ○ python-workbench  Python workbench
+  ○ steam-game  Steam game server
+Preview
+
+Nothing to show until it renders: no base snippet: add one (flkforge snippets
+--category base)
+
+
+
+
+
+─ hint ─────────────────────────────────────────────────────────────────────────
+ core/blank: A base image and nothing else: add snippets with flkforge add.
+ Snippets: base-ubuntu. enter starts from it; the next steps change anything.
+ tab/↑↓ move · ctrl+n/ctrl+p step · ctrl+d remove · ctrl+f file · ctrl+t hints …

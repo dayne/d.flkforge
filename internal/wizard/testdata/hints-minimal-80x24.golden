@@ -1,0 +1,24 @@
+ flkforge new · mygame-flk · /tmp/mygame.flk                          ✓ renders 
+ Step 9/12: Backups   ‹ Health   Resources ›                                    
+ Backups  how a backup keeps it from writing                                    
+                                                                                
+› ■ backup-pause  Backups: pause the VM  · ctrl+d removes                       
+    verify         (optional)                                                   
+    keep           (optional)                                                   
+  ■ before-deploy  Back up before each deploy                                   
+    keep_releases  default: 3                                                   
+  + add a backup snippet…                                                       
+                                                                                
+                                                                                
+ Dockerfile  flk.toml  flk-run  flk-run.d/prestart  flk-run.d/watch   ctrl+f    
+   stdin = "null"     # the app has no console input                            
+                                                                                
+▌# Backups freeze the VM for the copy (a second or two): the copy holds what    
+▌# was on disk, like after a power cut. Fine for apps that write atomically     
+▌# or journal; nobody is disconnected.                                          
+ [flk.backup]                                                                   
+▌  mode = "pause"                                                               
+   before_deploy = true                                                         
+─ hint ─────────────────────────────────────────────────────────────────────────
+ core/backup-pause: Backups: pause the VM                                       
+ tab/↑↓ move · ctrl+n/ctrl+p step · ctrl+d remove · ctrl+f file · ctrl+t hints …

@@ -1,6 +1,9 @@
 package snippet
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestCoerce(t *testing.T) {
 	i := func(n int64) *int64 { return &n }
@@ -38,5 +41,33 @@ func TestParseRefusesUnknownKeys(t *testing.T) {
 	_, err := Parse([]byte("id = \"core/x\"\nversion = \"1\"\ntitle = \"x\"\ncategory = \"misc\"\nsummary = \"x\"\ntypo = 1\n"))
 	if err == nil {
 		t.Error("an unknown key should fail")
+	}
+}
+
+// What FormatValue shows, ParseValue reads back.
+func TestValueRoundTrip(t *testing.T) {
+	for _, tc := range []struct {
+		p Param
+		v any
+	}{
+		{Param{Type: "string"}, "3.20"},
+		{Param{Type: "int"}, int64(42)},
+		{Param{Type: "bool"}, true},
+		{Param{Type: "list"}, []string{"a", "b"}},
+		{Param{Type: "list"}, []string{"bash", "-c", "exec java -jar \"x\", y"}},
+		{Param{Type: "map"}, map[string]any{"A": "1", "B c": "two"}},
+		{Param{Type: "duration"}, "30s"},
+	} {
+		s := FormatValue(&tc.p, tc.v)
+		back, err := ParseValue(&tc.p, s)
+		if err != nil {
+			t.Errorf("%v -> %q: %v", tc.v, s, err)
+			continue
+		}
+		got, _ := tc.p.Coerce(back)
+		want, _ := tc.p.Coerce(tc.v)
+		if fmt.Sprint(got) != fmt.Sprint(want) {
+			t.Errorf("%v -> %q -> %v", tc.v, s, got)
+		}
 	}
 }

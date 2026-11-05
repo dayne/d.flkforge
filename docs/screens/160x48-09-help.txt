@@ -1,0 +1,48 @@
+ flkforge: keys
+ Moving
+   tab, ↓ / shift+tab, ↑    next / previous field
+   ctrl+n, pgdown, ]        next step (] and [ outside a text field)
+   ctrl+p, pgup, [          previous step
+   enter                    next field; on the last one, the next step
+
+ Editing
+   type                     edit a text field (ctrl+u clears it, ←/→ move)
+   ←/→, space               change a choice or a yes/no
+   enter on "+ add…"        add a snippet; one that conflicts with a snippet
+                            already there replaces it (a backup mode, a base)
+   ctrl+d                   remove the focused snippet
+
+ Seeing
+   ctrl+f                   next file in the preview (it follows the focused
+                            snippet otherwise; its lines are marked ▌)
+   ctrl+t                   hints: full, summary, minimal
+   ?, F1                    this help (outside a text field)
+
+ Leaving
+   Review, then "Write"     write the files (nothing is deployed)
+   esc, ctrl+c              quit (twice if nothing is written yet)
+
+ The command line does all of this too: flkforge help --all.
+ Press any key to go back.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

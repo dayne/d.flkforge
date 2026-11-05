@@ -6,9 +6,9 @@ depends on them; ask the user when it's their call.
 ## Decisions
 
 - ~~(M0) Final `snippet.toml` field names~~: settled 2026-11-04 (SPEC 4).
-- ~~(M0) Forms~~: decided 2026-11-04: `charm.land/huh/v2` exists
-  (v2.0.3); use it for the forms (M4). The preview and hint panes are
-  built on bubbletea.
+- ~~(M0) Forms~~: decided 2026-11-04 for huh v2, then changed in M4
+  (2026-11-05): hand-built widgets on bubbletea, as lazyflk does (SPEC
+  8.2 has the reasons).
 - ~~(M1) Run wrapper shape~~: decided 2026-11-04: one versioned engine
   (`flk-run`) plus hooks the admin owns (SPEC 6.6).
 - ~~(M1) The engine's env names and hooks~~: settled (SPEC 6.6).
@@ -29,8 +29,8 @@ depends on them; ask the user when it's their call.
   `flk volumes create` itself refuses them, and match it exactly.
 - ~~(M2) check: deployed or only registered~~: done (flk status --json).
 - (M2) Show the diff itself on drift (now: the `diff -u` command to run).
-- (M2) How much of flk's own help to show inline versus pointing at
-  `flk help ...`. Inline text goes stale; pointers don't.
+- ~~(M2) Inline flk help vs pointers~~: pointers in hints ("More: flk
+  help ..."), and `flkforge explain KEY` quotes flk's own reference live.
 
 ## Hub (later, design only)
 
@@ -85,6 +85,16 @@ What's known so far:
   Its admin UI needs credentials (adminAuth in settings.js with a hashed
   password: a secret, never in flk.toml). Check its image's entrypoint
   and how it handles SIGTERM before writing the stop hints.
+
+## From M4
+
+- Wizard: editing a multi-line param (a start script's body) in $EDITOR
+  (tea.ExecProcess), instead of "edit the file after writing".
+- Wizard: the mouse (click a step, a field, a preview tab).
+- Wizard: a step's snippets could show their own short summary under the
+  header at the summary hint level; at 80x24 the form has room for ~8 rows.
+- lazyflk's "new app…" action could run `flkforge new` (propose it to the
+  lazyflk session; PLAN, Later).
 
 ## From M3
 

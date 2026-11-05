@@ -1,0 +1,48 @@
+ flkforge new · mygame-flk · /tmp/mygame.flk                                                                                                     ✗ 3 to fill in 
+ Steps               Add to Backups  enter adds, esc cancels                │  Dockerfile  flk.toml  flk-run  flk-run.d/prestart  flk-run.d/watch   TODO: to fi…
+                                                                            │  # mygame-flk: made by flkforge from flkforge.toml. Change the recipe and run     
+   1 Start          › backup-live-console  Copy the volume while the server…│  # `flkforge render`, or edit this file and stop using flkforge for it.           
+   2 Name             backup-stop          flk volumes backup stops the mac…│  app = "mygame-flk"                                                               
+   3 Base             backup-verify        A host script flk runs on every …│                                                                                   
+!  4 Software                                                               │  # flk-run stops the server cleanly within stop_timeout (90s); give it            
+   5 Process                                                                │  # that, plus a margin, before flk kills the VM.                                  
+   6 User & data                                                            │  kill_timeout = 120                                                               
+!  7 Network                                                                │                                                                                   
+!  8 Health                                                                 │  [build]                                                                          
+ › 9 Backups                                                                │    dockerfile = "Dockerfile"                                                      
+  10 Resources                                                              │                                                                                   
+  11 Env & secrets                                                          │    # The Steam build this release runs. Bump it to upgrade.                       
+  12 Review                                                                 │    args = { STEAM_BUILDID = "latest" }                                            
+                                                                            │                                                                                   
+ ctrl+n next                                                                │  [env]                                                                            
+ ctrl+p back                                                                │    # flk-run, the run engine (see flk-run for details)                            
+                                                                            │    RUN_STOP = "signal:INT"                                                        
+                                                                            │    STOP_TIMEOUT = "90"     # then SIGTERM (< kill_timeout)                        
+                                                                            │    RESTART_DELAY = "10"    # seconds before restarting after a crash              
+                                                                            │    MAX_RESTARTS = "5"      # give up after this many restarts...                  
+                                                                            │    RESTART_WINDOW = "600"  # ...within this many seconds                          
+                                                                            │                                                                                   
+                                                                            │  # The run wrapper restarts the server itself and gives up on a crash loop        
+                                                                            │  # (exits 1). flk's restart policy is only the outer net: restart the VM          
+                                                                            │  # once, then leave it stopped for a human.                                       
+                                                                            │  [[restart]]                                                                      
+                                                                            │    policy = "on-failure"                                                          
+                                                                            │    retries = 1                                                                    
+                                                                            │                                                                                   
+                                                                            │  [flk]                                                                            
+                                                                            │    keep_releases = 3  # images kept for flk releases rollback (default 2)         
+                                                                            │    stdin = "null"     # the app has no console input                              
+                                                                            │                                                                                   
+                                                                            │  # Backups freeze the VM for the copy (a second or two): the copy holds what      
+                                                                            │  # was on disk, like after a power cut. Fine for apps that write atomically       
+                                                                            │  # or journal; nobody is disconnected.                                            
+─ hint ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ core/backup-live-console: Backups: live, with console save hooks                                                                                               
+ Sets [flk.backup] mode = "live" with console pre and post hooks.                                                                                               
+ flk volumes backup types each pre line into the app's console (its stdin, the serial console), waits for the wait regex after the last one, then copies the    
+ running volume and runs e2fsck on the copy. The post lines run afterwards whatever happened. The console must reach the app: stdin "console" (the default),    
+ and a run wrapper that forwards it (flk-run does).                                                                                                             
+ ! If the wait line never comes, the backup fails after timeout and the post hooks still run.                                                                   
+ ! Not with stdin = "null": the hooks would go nowhere (rule live-backup-console).                                                                              
+ More: flk help --all (Config: [flk.backup]); flk help volumes backup                                                                                           
+ ↑↓ choose · enter add · esc cancel                                                                                                                             

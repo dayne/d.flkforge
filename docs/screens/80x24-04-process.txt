@@ -1,0 +1,24 @@
+ flkforge new · flkt-forge-steam · …tchpad/screens2-80x24.flk    ✗ 2 to fill in
+ Step 5/12: Process   ‹ Software   User & data ›   ! Network, Health
+ Process  how it runs, stops and restarts
+
+  ■ run-wrapper  Run engine (flk-run)
+›   command         /server/valheim_server.x86_64, -port, 2466
+    stop            signal:INT
+    stop_timeout    90
+    kill_margin     default: 30
+ Dockerfile  flk.toml  flk-run  flk-run.d/prestart  flk-run.d/watch   TODO: to …
+ COPY --from=steam /server /server
+
+▌# The run engine (flkforge's core/run-wrapper) and its hooks. Late in the
+▌# file, so changing them doesn't rebuild the layers above.
+▌COPY flk-run /usr/local/bin/flk-run
+▌COPY flk-run.d/ /usr/local/lib/flk-run/
+─ hint ─────────────────────────────────────────────────────────────────────────
+ run-wrapper.command (list, required): The server's command and arguments (exec
+ form: ["/server/srv", "-port", "2456"])
+ No shell expansion: flk-run runs it as is. For arguments built from the
+ environment, use ["bash", "-c", "exec ./srv -name \"$NAME\""] or write them in
+ a prestart hook.
+ A list: a, b, c (or a TOML array for items with commas).
+ tab/↑↓ move · ctrl+n/ctrl+p step · ctrl+d remove · ctrl+f file · ctrl+t hints …

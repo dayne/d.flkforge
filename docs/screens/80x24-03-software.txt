@@ -1,0 +1,24 @@
+ flkforge new · flkt-forge-steam · …tchpad/screens2-80x24.flk    ✗ 3 to fill in
+ Step 4/12: Software   ‹ Base   Process ›   ! Process, Network, Health
+ Software  how the program gets in
+
+  ■ packages  Extra packages
+    list          ca-certificates, tzdata
+  ■ steamcmd  Steam dedicated server (steamcmd)
+›   app_id        896660
+    build_id      default: latest
+    platform      default: linux
+ Dockerfile  flk.toml  flk-run  flk-run.d/prestart  flk-run.d/watch   TODO: to …
+ # flkt-forge-steam: made by flkforge from flkforge.toml. Change the recipe and…
+ # `flkforge render`, or edit this file and stop using flkforge for it.
+ #
+▌# The server is Steam app 896660, downloaded by steamcmd in its own stage
+▌# and pinned by STEAM_BUILDID ([build] args in flk.toml). Steam serves only
+▌# its current build, so the build fails once Steam has moved past the pin;
+─ hint ─────────────────────────────────────────────────────────────────────────
+ steamcmd.app_id (int, required): Steam app id of the dedicated server
+ The server's own app id, not the game's: Valheim's is 896660. Search
+ steamdb.info for 'dedicated server'.
+ Downloads the server with steamcmd in a build stage and copies it into the
+ image, pinned to a Steam build.
+ tab/↑↓ move · ctrl+n/ctrl+p step · ctrl+d remove · ctrl+f file · ctrl+t hints …

@@ -1,0 +1,24 @@
+ flkforge new · flkt-forge-steam · …tchpad/screens2-80x24.flk    ✗ 1 to fill in
+ Step 7/12: Network   ‹ User & data   Health ›   ! Health
+ Network  ports
+
+  ■ service  Service port
+›   port       2466
+    protocol   udp
+    host_port  (optional)
+    comment    (optional)
+  + add a port or network snippet…
+
+ Dockerfile  flk.toml  flk-run  flk-run.d/prestart  flk-run.d/watch   TODO: to …
+   source = "data"
+   destination = "/data"
+
+▌[[services]]
+▌  internal_port = 2466
+▌  protocol = "udp"
+▌  [[services.ports]]
+▌    port = 2466
+─ hint ─────────────────────────────────────────────────────────────────────────
+ service.port (port, required): The port the server listens on inside the VM
+ Adds a [[services]] entry: flk forwards the host port to the VM's port.
+ tab/↑↓ move · ctrl+n/ctrl+p step · ctrl+d remove · ctrl+f file · ctrl+t hints …

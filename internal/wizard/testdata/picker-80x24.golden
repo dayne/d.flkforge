@@ -1,0 +1,24 @@
+ flkforge new · mygame-flk · /tmp/mygame.flk                     ✗ 3 to fill in 
+ Step 9/12: Backups   ‹ Health   Resources ›   ! Software, Network, Health      
+ Add to Backups  enter adds, esc cancels                                        
+                                                                                
+› backup-live-console  Copy the volume while the server runs, after console com…
+  backup-stop          flk volumes backup stops the machine, copies, and starts…
+  backup-verify        A host script flk runs on every backup to check it holds…
+                                                                                
+                                                                                
+ Dockerfile  flk.toml  flk-run  flk-run.d/prestart  flk-run.d/watch   TODO: to …
+ # mygame-flk: made by flkforge from flkforge.toml. Change the recipe and run   
+ # `flkforge render`, or edit this file and stop using flkforge for it.         
+ app = "mygame-flk"                                                             
+                                                                                
+ # flk-run stops the server cleanly within stop_timeout (90s); give it          
+ # that, plus a margin, before flk kills the VM.                                
+─ hint ─────────────────────────────────────────────────────────────────────────
+ core/backup-live-console: Backups: live, with console save hooks               
+ Sets [flk.backup] mode = "live" with console pre and post hooks.               
+ flk volumes backup types each pre line into the app's console (its stdin, the  
+ serial console), waits for the wait regex after the last one, then copies the  
+ running volume and runs e2fsck on the copy. The post lines run afterwards      
+ whatever happened. The console must reach the app: stdin "console" (the        
+ ↑↓ choose · enter add · esc cancel                                             

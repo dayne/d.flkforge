@@ -1,0 +1,48 @@
+ flkforge new · flkt-forge-steam · …3bf-8688-9086fc354ccf/scratchpad/screens2-160x48.flk                                                              ✓ renders
+ Steps               Health  what a deploy waits for                        │  Dockerfile  flk.toml  flk-run  flk-run.d/prestart  flk-run.d/watch   ctrl+f
+                                                                            │    MAX_RESTARTS = "5"      # give up after this many restarts...
+   1 Start            ■ check-log  Log health check                         │    RESTART_WINDOW = "600"  # ...within this many seconds
+   2 Name               name   default: ready                               │
+   3 Base           ›   match  Game server connected                        │  # The run wrapper restarts the server itself and gives up on a crash loop
+   4 Software           grace  5m                                           │  # (exits 1). flk's restart policy is only the outer net: restart the VM
+   5 Process          + add a health check…                                 │  # once, then leave it stopped for a human.
+   6 User & data                                                            │  [[restart]]
+   7 Network                                                                │    policy = "on-failure"
+ › 8 Health                                                                 │    retries = 1
+   9 Backups                                                                │
+  10 Resources                                                              │  [flk]
+  11 Env & secrets                                                          │    keep_releases = 3  # images kept for flk releases rollback (default 2)
+  12 Review                                                                 │    stdin = "null"     # the app has no console input
+                                                                            │
+ ctrl+n next                                                                │  # Backups freeze the VM for the copy (a second or two): the copy holds what
+ ctrl+p back                                                                │  # was on disk, like after a power cut. Fine for apps that write atomically
+                                                                            │  # or journal; nobody is disconnected.
+                                                                            │  [flk.backup]
+                                                                            │    mode = "pause"
+                                                                            │    before_deploy = true
+                                                                            │
+                                                                            │ ▌# A deploy waits for this line on the console; a machine that doesn't log
+                                                                            │ ▌# it within grace_period goes back to its previous release.
+                                                                            │ ▌[checks.ready]
+                                                                            │ ▌  type = "log"
+                                                                            │ ▌  match = "Game server connected"
+                                                                            │ ▌  grace_period = "5m"
+                                                                            │ ▌
+                                                                            │  [[vm]]
+                                                                            │    cpus = 2
+                                                                            │    memory = "4gb"
+                                                                            │
+                                                                            │  [[mounts]]
+                                                                            │    source = "data"
+                                                                            │    destination = "/data"
+                                                                            │
+                                                                            │  [[services]]
+                                                                            │    internal_port = 2466
+                                                                            │    protocol = "udp"
+                                                                            │    [[services.ports]]
+                                                                            │      port = 2466
+─ hint ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ check-log.match (regex, required): A regex for the line that means the app is ready
+ The same line as core/run-wrapper's ready, typically. A Ruby regex, matched line by line against the console since boot: ^ and $ anchor the line.
+ Adds a log check: deploys wait for the app's ready line.
+ tab/↑↓ move · ctrl+n/ctrl+p step · ctrl+d remove · ctrl+f file · ctrl+t hints · F1 help · esc quit

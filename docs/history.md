@@ -263,3 +263,12 @@ lock, a change upstream refused until --relock, publish onto
 flkforge/publish-..., the published recipe found by search, publishing
 into core refused, rm. No real hub repo exists yet: creating one
 (github.com/dayne/flkforge-hub?) is Dayne's call.
+
+## 2026-11-05: the lazyflk proposal (PLAN, Later)
+
+docs/lazyflk-proposal.md: "new app…" hands the terminal to `flkforge new`
+(lazyflk already uses tea.ExecProcess), plus optional remix (`flkforge
+edit`) and check (`flkforge check --json`) for apps with a flkforge.toml;
+check works today as a .lazyflk.toml app action. Nothing changed in
+lazyflk. With this, PLAN's Later section is done: import, the hub, and
+the proposal.

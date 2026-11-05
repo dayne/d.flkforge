@@ -126,5 +126,6 @@ that's no longer needed. Record each one in `BUGS.flk.md` (Status) and
 - ~~Import~~: done 2026-11-05 (`flkforge import`, SPEC 9.1).
 - ~~The hub~~: done 2026-11-05 (SPEC 10): git hubs, trust and the lock,
   publish on a branch.
-- A lazyflk hook ("new app…" runs flkforge). Propose it to the lazyflk
-  session, don't build it there.
+- ~~A lazyflk hook~~: proposed 2026-11-05 in docs/lazyflk-proposal.md
+  ("new app…" hands the terminal to flkforge new; remix and check for
+  apps with a recipe). No lazyflk session was running: Dayne passes it on.

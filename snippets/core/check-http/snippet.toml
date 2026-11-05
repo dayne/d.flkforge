@@ -1,0 +1,56 @@
+id = "core/check-http"
+version = "0.1.0"
+title = "HTTP health check"
+category = "check"
+summary = "A deploy waits until an HTTP path answers 2xx or 3xx; a machine that doesn't goes back to its previous release."
+multi = true
+source = "~/flk/examples/reference/flk.toml"
+
+[params.name]
+type = "string"
+default = "http"
+prompt = "Check name ([checks.NAME])"
+validate = '^[a-z0-9_-]+$'
+
+[params.port]
+type = "port"
+default = 8080
+prompt = "Port inside the VM"
+
+[params.path]
+type = "string"
+default = "/"
+prompt = "Path to request"
+validate = '^/'
+
+[params.grace]
+type = "duration"
+default = "30s"
+prompt = "How long it may take to pass after boot"
+
+[[flktoml]]
+text = '''
+# A deploy waits for this; a machine that fails it goes back to its
+# previous release.
+[checks.{{.P.name}}]
+  type = "http"
+  port = {{.P.port}}
+  path = {{toml .P.path}}
+  grace_period = {{toml .P.grace}}
+'''
+
+# Remove when flk fixes it (BUGS.flk.md #1).
+[[next]]
+kind = "gap"
+text = "flk 0.1.0's deploy crashes on type = \"http\" checks (NameError: Flk::Net::HTTP)"
+why = "reported in flkforge's BUGS.flk.md #1; until it's fixed, drop this check (deploy then waits for internal_port)"
+
+[hints]
+what = "Adds an http check to [checks]: deploys wait for the path to answer."
+under_the_hood = """
+After booting a machine, flk deploy requests http://MACHINE_IP:PORT/PATH
+until it answers 2xx or 3xx, for up to grace_period. If it never does, the
+machine is rolled back to its previous release and the deploy stops.
+"""
+gotchas = ["The grace period has to cover the app's slowest start (a first boot that creates data)."]
+docs = ["flk help --all  (Config: [checks.NAME])", "flk help deploy"]

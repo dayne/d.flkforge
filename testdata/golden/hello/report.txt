@@ -1,0 +1,19 @@
+flkforge: hello in DIR
+
+Written:
+  Dockerfile     written  base-alpine, packages, start-script, volume
+  flk.toml       written  env, http-service, vm, volume
+  start.sh       written  start-script: yours from now on: flkforge won't overwrite it
+  flkforge.toml  written  the recipe: what to render, and hashes of what was written
+
+flk config show: not checked with flk: file does not exist
+
+Not in effect yet:
+  - Port 8080 is on the machine's IP only (flk status shows it), not on a host port: set host_port to forward one
+
+For you to run, in DIR:
+  flk launch --no-deploy            # registers hello with flk, without building or starting anything
+  flk volumes create data --size 1  # [[mounts]] needs the volume before the first deploy (one per machine)
+  flk deploy                        # builds the image and starts the app; it waits for the health checks
+
+Next: cd DIR && flk launch --no-deploy

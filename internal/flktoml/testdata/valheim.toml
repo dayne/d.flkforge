@@ -1,0 +1,97 @@
+# flk.toml: a TEST Valheim dedicated server as a Firecracker microVM.
+#
+# Host-specific settings (where the volume and backups live, the LAN
+# address, the password, the host's Discord webhook) are not here: they're in
+# site.env (gitignored), applied by `bin/vh bootstrap` / `bin/vh secrets`.
+app = "valheim-flk"
+
+# Valheim saves the world on SIGINT (vh-run sends it); give it time.
+kill_timeout = 120
+
+[build]
+  dockerfile = "Dockerfile"
+  # The Steam build this release runs. `bin/vh update apply` bumps it.
+  args = { STEAM_BUILDID = "25909431" }
+
+[env]
+  TZ = "America/Anchorage"
+
+  # vh-run (see vh-run for details)
+  VH_NAME = "flk test"          # server list name (must not contain the password)
+  VH_WORLD = "flktest"          # world name, under /data/worlds_local
+  VH_PORT = "2456"              # game; Steam query is VH_PORT+1
+  VH_PUBLIC = "1"               # in the community server list (needs the password)
+  VH_CROSSPLAY = "0"            # later: 1, plus the udp/2458 service below
+  VH_SAVEINTERVAL = "1800"      # seconds between world saves (Valheim's default)
+  VH_BACKUPS = "2"              # Valheim's own backups in /data (flk does the real ones)
+  VH_PRESET = ""                # e.g. "casual", "easy", "hard", "hardcore"
+  VH_MODIFIERS = ""             # pairs, e.g. "raids none combat hard"
+  VH_SETKEYS = ""               # e.g. "nomap"
+  VH_ADMINS = ""                # SteamID64s, space-separated (adminlist.txt)
+  VH_PERMITTED = ""             # whitelist; empty = anyone with the password
+  VH_BANNED = ""                # added to bannedlist.txt
+  RESTART_DELAY = "10"          # seconds before restarting after a crash
+  MAX_RESTARTS = "5"            # give up after this many restarts...
+  RESTART_WINDOW = "600"        # ...within this many seconds
+  STOP_TIMEOUT = "90"           # SIGINT, then SIGTERM after this long (< kill_timeout)
+
+  # Game events (server up/down, joins, deaths) are gamebus lines in the log;
+  # the gamebus hub on the host routes them to MQTT and Discord (README).
+
+# vh-run restarts the server itself and gives up on a crash loop (exits 1).
+# flk's restart policy is only the outer net: restart the VM once, then
+# leave it stopped for a human.
+[[restart]]
+  policy = "on-failure"
+  retries = 1
+
+[flk]
+  keep_releases = 3   # old Steam builds exist only as these images
+  stdin = "null"      # Valheim has no console input
+
+# Backups: Valheim can't be told to stop writing or to save now, so a live
+# copy has nothing to flush with. "pause" freezes the VM for the copy
+# (a second or two; players aren't kicked): the copy holds the last
+# committed save, like after a power cut. verify: the world must be in it.
+# before_deploy: a deploy backs up first, and a release that fails its
+# check goes back with the world as it was.
+[flk.backup]
+  mode = "pause"
+  verify = "bin/vh-verify-backup"
+  before_deploy = true
+
+# UDP only, so the readiness check reads the log. A new world takes longer
+# to generate on its first start.
+[checks.ready]
+  type = "log"
+  match = "Game server connected"
+  grace_period = "5m"
+
+[[vm]]
+  cpus = 4
+  memory = "6gb"      # ~2.8GB idle reported; resize after watching flk machine stats
+
+[[mounts]]
+  source = "vhdata"
+  destination = "/data"   # -savedir: worlds_local/, adminlist.txt, backups
+
+# Game
+[[services]]
+  internal_port = 2456
+  protocol = "udp"
+  [[services.ports]]
+    port = 2456
+
+# Steam query (the server list)
+[[services]]
+  internal_port = 2457
+  protocol = "udp"
+  [[services.ports]]
+    port = 2457
+
+# Crossplay (later): uncomment with VH_CROSSPLAY = "1"
+# [[services]]
+#   internal_port = 2458
+#   protocol = "udp"
+#   [[services.ports]]
+#     port = 2458

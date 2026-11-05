@@ -1,0 +1,50 @@
+# flk.toml: the house MQTT broker (Eclipse Mosquitto) as a Firecracker microVM.
+# LAN clients: 10.47.11.3:1883 (logins required). VMs: this machine's
+# 172.30.0.x address (flk status). See README.md.
+app = "mqtt-flk"
+
+# Mosquitto saves its persistence db on SIGTERM; that's quick.
+kill_timeout = 15
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  TZ = "America/Anchorage"  # same as the games' logs
+
+[[vm]]
+  cpus = 1
+  memory = "256mb"
+
+[[mounts]]
+  source = "mqttdata"
+  destination = "/mosquitto/data"   # persistence db: retained messages, sessions
+
+[[services]]
+  internal_port = 1883
+  protocol = "tcp"
+  [[services.ports]]
+    port = 1883
+
+[[restart]]
+  policy = "always"         # it's infrastructure: always come back
+  retries = 10
+
+[checks.ready]
+  type = "log"
+  match = 'mosquitto version [0-9.]+ running'
+  grace_period = "60s"
+[checks.port]
+  type = "tcp"
+  port = 1883
+  grace_period = "60s"
+
+[flk]
+  keep_releases = 3
+
+# A few-MB db, written atomically (tmp file + rename): freezing the VM for
+# the copy is safe, and clients stay connected.
+[flk.backup]
+  mode = "pause"
+  keep = 7
+  before_deploy = true

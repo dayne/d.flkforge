@@ -1,0 +1,33 @@
+id = "core/base-alpine"
+version = "0.1.0"
+title = "Alpine Linux base"
+category = "base"
+summary = "A small base image (about 8 MB) with busybox and the apk package manager."
+tags = ["small"]
+source = "~/flk/examples/hello/Dockerfile, ~/mqtt.flk/Dockerfile"
+
+[params.version]
+type = "string"
+default = "3.20"
+prompt = "Alpine version (the image tag)"
+hint = "Pin a release such as 3.20, not latest, so a rebuild gives the same image."
+validate = '^[0-9]+\.[0-9]+(\.[0-9]+)?$'
+
+[base]
+image = "docker.io/library/alpine:{{.P.version}}"
+family = "apk"
+busybox = true
+
+[hints]
+what = "Starts the image from Alpine Linux: small, with busybox for the shell tools and apk for packages."
+under_the_hood = """
+flk deploy builds the Dockerfile with podman and turns the image into the
+VM's root filesystem. /bin/sh is busybox, so flk boots the image with its
+shell init (/flk/init). The image name is written in full (docker.io/library/...)
+because podman on this host has no search registries for short names.
+"""
+gotchas = [
+  "busybox has no setpriv or chroot --userspec: an app meant to run as a non-root USER silently runs as root unless the image has setpriv (flk's init needs it).",
+  "musl, not glibc: prebuilt Linux binaries (game servers, many downloads) usually won't run here; use base-ubuntu or base-debian for those.",
+]
+docs = ["flk help --all  (Machines: the guest is a VM)", "flk help first-app"]

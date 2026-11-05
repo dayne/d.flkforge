@@ -1,0 +1,48 @@
+id = "core/http-service"
+version = "0.1.0"
+title = "HTTP service"
+category = "network"
+summary = "The app's HTTP port: flk waits for it after boot, and serves it on the machine IP (and a host port, if you want)."
+source = "~/flk/examples/hello/flk.toml, ~/flk/examples/reference/flk.toml"
+
+[params.port]
+type = "port"
+default = 8080
+prompt = "The port the app listens on inside the VM"
+
+[params.host_port]
+type = "port"
+prompt = "Also serve it on this host port (optional)"
+hint = "Without one, it's reachable only on the machine's IP (172.30.0.x, see flk status), from this host. Host ports below 1024 need a root step."
+
+[[flktoml]]
+text = '''
+# The port flk waits for after boot and prints as the app's URL.
+[http_service]
+  internal_port = {{.P.port}}
+'''
+
+[[flktoml]]
+when = "{{if .P.host_port}}true{{end}}"
+text = '''
+[flk]
+  http_port = {{.P.host_port}}  # host port for [http_service]
+'''
+
+[[next]]
+kind = "pending"
+when = "{{if not .P.host_port}}true{{end}}"
+text = "Port {{.P.port}} is on the machine's IP only (flk status shows it), not on a host port"
+why = "set host_port to forward one"
+
+[hints]
+what = "Declares the app's HTTP port in [http_service]."
+under_the_hood = """
+After a deploy boots a machine, flk waits for its first internal_port to
+accept connections (up to 30s without checks; with checks, it waits for
+those). The port is on the machine's IP; [flk] http_port forwards a host
+port to it. Forwarding skips 127.0.0.1: from the host, use the LAN IP or
+the machine IP.
+"""
+gotchas = ["Host ports below 1024 are refused unless the host was set up for them (a root step)."]
+docs = ["flk help --all  (Config: [http_service], [flk] http_port)"]

@@ -1,0 +1,25 @@
+id = "core/packages"
+version = "0.1.0"
+title = "Extra packages"
+category = "fetch"
+summary = "Install packages from the base's distribution, in the image's one install line."
+requires = ["category:base"]
+source = "every Dockerfile on this host"
+packages = '{{join .P.list " "}}'
+
+[params.list]
+type = "list"
+required = true
+prompt = "Packages to install (names in the base's package manager)"
+hint = "Names differ between apt (Debian, Ubuntu) and apk (Alpine): busybox-extras on Alpine has httpd, for instance."
+
+
+[hints]
+what = "Adds the packages to the single install line flkforge writes for the base (apk add, apt-get install or dnf install)."
+under_the_hood = """
+All packages from all snippets go in one RUN line, cleaned up in the same
+layer (apt's lists are removed), so the image stays small and the layer
+is cached until the list changes.
+"""
+gotchas = ["Unpinned packages change when the distribution updates; the base image tag is the pin that matters most."]
+docs = ["flk help --all  (Config: [build])"]

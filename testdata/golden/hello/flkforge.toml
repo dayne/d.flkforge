@@ -1,0 +1,57 @@
+# Written by flkforge. Change it with flkforge's commands or by hand, then
+# run `flkforge render`. The [lock] and [render] tables are flkforge's.
+flkforge = "0.1.0"
+app = "hello"
+
+[[use]]
+  snippet = "core/base-alpine"
+  params = { version = "3.20" }
+
+[[use]]
+  snippet = "core/packages"
+  params = { list = ["busybox-extras"] }
+
+[[use]]
+  snippet = "core/start-script"
+
+  [use.params]
+    body = '''
+#!/bin/sh
+# Demo: env, secrets, and a volume that survives redeploys.
+set -e
+n=$(( $(cat /data/boots 2>/dev/null || echo 0) + 1 ))
+echo "$n" > /data/boots
+mkdir -p /www
+cat > /www/index.html <<HTML
+<h1>Hello from $FLK_HOSTNAME</h1>
+<p>machine $FLK_MACHINE_ID, app $FLK_APP_NAME, release $FLK_RELEASE</p>
+<p>GREETING=$GREETING</p>
+<p>API_TOKEN secret present: ${API_TOKEN:+yes}</p>
+<p>boots recorded on /data volume: $n</p>
+HTML
+echo "serving on :8080 (boot #$n)"
+exec httpd -f -v -p 8080 -h /www
+'''
+
+[[use]]
+  snippet = "core/env"
+  params = { vars = { GREETING = "hi from flk" } }
+
+[[use]]
+  snippet = "core/http-service"
+  params = { port = 8080 }
+
+[[use]]
+  snippet = "core/vm"
+  params = { size = "shared-cpu-1x" }
+
+[[use]]
+  snippet = "core/volume"
+  params = { name = "data", path = "/data" }
+
+[lock]
+  flkforge = "0.1.0"
+
+[render]
+  Dockerfile = "sha256:22111cdcdd5f3708136e12ab661f91f9a7b0ef3ec07703e34ac654aebcb13359"
+  "flk.toml" = "sha256:060e6a3c447ad73e695984cf386ed7e88259c341c4f1433ff6b812afe007ea4f"

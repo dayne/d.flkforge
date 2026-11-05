@@ -8,8 +8,8 @@ choice does under the hood. A later version will browse a **hub** of
 shared snippets and recipes; v1 doesn't build the hub, but it's designed
 so the hub can be added without rework.
 
-Nothing is implemented yet. This folder holds the design and the plan.
-Read, in this order:
+M0 is built (CLI, snippet format, renderer, check; see
+`docs/history.md`). Read, in this order:
 
 1. `README.md`: what flkforge is, in a page.
 2. `docs/flk-primer.md`: the flk ecosystem. **Read it before writing any
@@ -81,15 +81,18 @@ mode, fixtures captured from real flk output). Go is at `~/.local/go/bin`.
 
 Suggested layout (adjust as needed, and record changes in SPEC):
 
-    cmd/flkforge/         main, argument parsing, help
+    cmd/flkforge/         main
+    internal/cli/         the command table, parsing, help, output (text and --json)
+    internal/forge/       I/O around render: write files, drift, check, the report
     internal/snippet/     the snippet format: load, validate, params
     internal/source/      where snippets come from (embedded, dirs; hub later)
     internal/recipe/      flkforge.toml: read, write, lock
-    internal/render/      Dockerfile and flk.toml assembly, rules, drift
-    internal/flk/         calls to the flk CLI (config show, help --all, apps list)
-    internal/wizard/      the TUI
+    internal/render/      Dockerfile and flk.toml assembly, rules (pure)
+    internal/flktoml/     flk.toml's TOML subset, keeping comments: parse, merge, format
+    internal/flk/         calls to the flk CLI (config show, help --all, apps, volumes)
+    internal/wizard/      the TUI (M4)
     snippets/             the built-in catalog (embedded with go:embed)
-    testdata/             recipes and the expected output for golden tests
+    testdata/             recipes; golden/ has the expected output (make golden)
 
 Keep `internal/render` free of I/O and of the TUI so it can be tested on
 its own. The wizard and the CLI are two front ends over the same recipe
@@ -101,7 +104,12 @@ and render code.
   changed.
 - Snippet hints are user documentation: keep them accurate and short, and
   say where in flk's help to read more.
-- `go test ./...` passes before every commit, and so does the golden suite
-  (`make test`).
+- `make check` (gofmt, vet, build, tests) passes before every commit.
+  The golden files change only on purpose: `make golden`, then read the
+  `git diff`. Tests that need flk (the flk half of the M0 acceptance) skip
+  without it; run them on the reference host.
+- Adding a snippet: `snippets/core/NAME/snippet.toml` (SPEC 4). Check it
+  with `go test ./internal/source` (it loads every built-in) and a recipe
+  that uses it through `flkforge new ... --recipe`.
 - Record finished milestones and decisions in `docs/history.md`, with
   absolute dates.

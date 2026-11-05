@@ -35,4 +35,10 @@ commands to run next (`flk launch --no-deploy`, `flk volumes create ...`,
 Later: a **hub** of shared snippets and whole-app recipes
 (`flkforge hub search valheim`).
 
-Status: design only. See `AGENTS.md`, `SPEC.md` and `PLAN.md`.
+Status: M0 (2026-11-04). `new --recipe FILE --yes`, `render`, `check`,
+`snippets`, `help` and `version` work, with the snippets for a small web
+app (`flkforge snippets`). The wizard, `edit`, `explain`, templates and the
+rest of the catalog are still to come: `PLAN.md`.
+
+    make install                   # ~/.local/bin/flkforge
+    flkforge new ~/myapp.flk --recipe testdata/hello.toml --yes --app flkt-myapp

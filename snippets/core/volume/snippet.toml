@@ -1,0 +1,70 @@
+id = "core/volume"
+version = "0.1.0"
+title = "Volume"
+category = "data"
+summary = "A volume mounted into the VM: what must survive a deploy lives here."
+multi = true
+source = "~/flk/examples/hello/flk.toml, ~/valheim.flk (BUGS #4)"
+
+[params.name]
+type = "string"
+default = "data"
+prompt = "Volume name"
+validate = '^[a-z0-9_]+$'
+hint = "Lowercase letters, digits and _. Each machine needs its own volume of this name."
+
+[params.path]
+type = "string"
+default = "/data"
+prompt = "Mount point in the VM"
+validate = '^/[A-Za-z0-9._/-]*$'
+
+[params.size]
+type = "int"
+default = 1
+min = 1
+prompt = "Size in GB (for flk volumes create)"
+
+[params.holds]
+type = "string"
+prompt = "What lives on it (for the Dockerfile's header comment)"
+
+[[dockerfile]]
+slot = "header"
+text = "# On the {{.P.name}} volume, at {{.P.path}}{{if .P.holds}}: {{.P.holds}}{{else}}: what must survive a deploy{{end}}."
+
+[[dockerfile]]
+slot = "dirs"
+when = "{{if .App.User}}true{{end}}"
+text = '''
+# The mount point, owned by the app's user, so the volume's root takes
+# that owner the first time it's mounted.
+RUN install -d -o {{.App.User}} -g {{.App.User}} {{.P.path}}'''
+
+[[flktoml]]
+text = '''
+[[mounts]]
+  source = {{toml .P.name}}
+  destination = {{toml .P.path}}
+'''
+
+[[next]]
+order = 20
+text = "flk volumes create {{.P.name}} --size {{.P.size}}"
+why = "[[mounts]] needs the volume before the first deploy (one per machine)"
+
+[hints]
+what = "Mounts a volume at a path in the VM, and says how to create it."
+under_the_hood = """
+The root filesystem is rebuilt from the image on every deploy, so anything
+that must survive (a world, a database, settings changed at runtime) goes
+on a volume. A volume is an ext4 image that flk attaches as a disk; init
+mounts it before the app starts. A new volume is empty; without --owner,
+its root takes the owner of the mount point in the image on first use.
+"""
+gotchas = [
+  "A volume mounted over a directory hides what the image put there.",
+  "The volume must exist before the deploy: flk volumes create NAME --size N.",
+  "flk volumes backup copies it; pick a backup mode that suits the app.",
+]
+docs = ["flk help volumes", "flk help --all  (Config: [[mounts]])"]

@@ -5,8 +5,7 @@ depends on them; ask the user when it's their call.
 
 ## Decisions
 
-- (M0) Final `snippet.toml` field names. The sketch in SPEC 4 is a
-  starting point; settle it and update the SPEC.
+- ~~(M0) Final `snippet.toml` field names~~: settled 2026-11-04 (SPEC 4).
 - ~~(M0) Forms~~: decided 2026-11-04: `charm.land/huh/v2` exists
   (v2.0.3); use it for the forms (M4). The preview and hint panes are
   built on bubbletea.
@@ -17,9 +16,15 @@ depends on them; ask the user when it's their call.
 - (M1) The fake server for the M1 deploy test: a few lines of bash, or
   a tiny Go binary built in a stage. Bash is enough unless it needs to
   behave like a real server in some way bash can't.
-- (M1) Should generated files carry a "made by flkforge" header? Leaning
-  towards one comment line in each file pointing at `flkforge.toml`,
-  since the drift hashes do the real work.
+- ~~(M1) A "made by flkforge" header~~: done in M0, two comment lines in
+  each managed file pointing at `flkforge.toml` (seed files get none:
+  they're the admin's).
+- (M1) Volume names: flk's backup file names only allow `[a-z0-9_]`, so
+  `core/volume` refuses dashes. Confirm with the flk session whether
+  `flk volumes create` itself refuses them, and match it exactly.
+- (M2) `check` can't tell whether the app is deployed, only registered:
+  read `flk status --json` for the release and machine state.
+- (M2) Show the diff itself on drift (now: the `diff -u` command to run).
 - (M2) How much of flk's own help to show inline versus pointing at
   `flk help ...`. Inline text goes stale; pointers don't.
 

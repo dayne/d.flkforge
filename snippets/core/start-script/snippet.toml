@@ -1,0 +1,61 @@
+id = "core/start-script"
+version = "0.1.0"
+title = "Start script"
+category = "wrapper"
+summary = "A shell script that is the app: set things up, then exec the program."
+requires = ["category:base"]
+source = "~/flk/examples/hello/start.sh"
+
+[params.file]
+type = "string"
+default = "start.sh"
+prompt = "The script's name in the app directory"
+validate = '^[A-Za-z0-9._-]+$'
+
+[params.dest]
+type = "string"
+default = "/start.sh"
+prompt = "Where it goes in the image"
+validate = '^/[A-Za-z0-9._/-]+$'
+
+[params.body]
+type = "string"
+prompt = "The script (written once; after that it's yours to edit)"
+hint = "End with exec PROGRAM, so the program is the VM's main process and gets flk's SIGTERM on stop."
+default = '''
+#!/bin/sh
+# The app: set things up, then exec the program so it gets flk's SIGTERM.
+set -e
+echo "starting"
+exec sleep infinity
+'''
+
+[[file]]
+path = "{{.P.file}}"
+mode = "755"
+own = "seed"
+text = "{{.P.body}}"
+
+[[dockerfile]]
+slot = "copy"
+text = "COPY {{.P.file}} {{.P.dest}}"
+
+[[dockerfile]]
+slot = "entry"
+text = 'CMD ["{{.P.dest}}"]'
+
+[hints]
+what = "Copies a start script into the image and makes it the command the VM runs."
+under_the_hood = """
+flk's init (PID 1) runs the image's ENTRYPOINT/CMD as the one app, after
+it has mounted the volumes and written the hostname and /etc/hosts. When
+the app exits, the VM powers off. On flk machine stop, the app gets
+SIGTERM, then the VM is killed after kill_timeout (10s by default): a
+script that execs its program passes the signal straight to it.
+"""
+gotchas = [
+  "flkforge writes the script once (mode 755) and never overwrites it: edit it freely. COPY keeps the mode, so keep it executable.",
+  "Without exec, the shell is the main process and the program may never see SIGTERM.",
+  "There's no systemd: a daemon runs in the foreground.",
+]
+docs = ["flk help --all  (Machines)", "flk help operate"]

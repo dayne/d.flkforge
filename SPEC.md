@@ -70,7 +70,8 @@ can be left off when the name is unique.
       files/              templates copied into the app (optional)
       README.md           the long explanation (optional; `flkforge explain`)
 
-`snippet.toml`, sketched (finalize it in M0 and update this section):
+`snippet.toml` (settled in M0, 2026-11-04; `internal/snippet` is the
+schema, and unknown keys are errors):
 
 ```toml
 id = "core/steamcmd"
@@ -82,7 +83,9 @@ tags = ["game", "steam"]
 requires = ["category:base"]  # needs some base snippet
 conflicts = []
 suggests = ["core/run-wrapper", "core/backup-pause"]
+multi = false                 # true: usable more than once, each [[use]] with its own id
 source = "~/valheim.flk/Dockerfile"   # where the pattern was learned (docs only)
+packages = ""                 # a template: package names for the base's one install line
 
 [params.app_id]
 type = "int"
@@ -102,8 +105,12 @@ default = "latest"
 hint = "Pins the build in [build] args. Steam serves only its current build, so a pin that Steam has moved past fails the build on purpose."
 
 # Fragments. Dockerfile ones name a slot (section 6.1); flk.toml ones are
-# TOML text merged by section 6.2. Both are Go text/template with .P (params),
-# .App (name, user, uid, family...) and helper funcs.
+# commented TOML text merged by section 6.2. All text is Go text/template
+# with .P (this use's params; every param is present, nil when unset),
+# .ID (this use's id), .App (Name, Image, Family, BaseUser, User, Uses) and
+# helpers: toml (a value as TOML), key (a TOML key), json, sh (shell
+# quoting), join, lower, upper, has, default, trim, indent. Any fragment,
+# file or next step can have `when`, a template that gives true or false.
 [[dockerfile]]
 stage = "steam"               # its own build stage; omit for the final stage
 slot = "fetch"
@@ -112,14 +119,21 @@ ARG STEAM_BUILDID=latest
 RUN for try in 1 2 3; do ... done
 '''
 
-# flk.toml fragments are records, not raw TOML text (section 6.2): a
-# table path, a key, a value (templated, then parsed as a TOML value) and
-# the comment that goes above it.
 [[flktoml]]
-table = "build.args"
-key = "STEAM_BUILDID"
-value = '"{{.P.build_id}}"'
-comment = "The Steam build this release runs. Bump it to upgrade."
+text = '''
+[build]
+  # The Steam build this release runs. Bump it to upgrade.
+  args = { STEAM_BUILDID = {{toml .P.build_id}} }
+'''
+
+[merge]                       # merge rules for keys set by more than one snippet (6.2)
+kill_timeout = "max"
+
+[[file]]                      # an extra file (6.3)
+path = "steam-update"         # a template, inside the app directory
+template = "steam-update.sh"  # in files/ (or text = inline)
+mode = "755"
+own = "managed"               # managed (default) or seed
 
 [hints]
 what = "Downloads the server with steamcmd in a build stage and copies it into the runtime image."
@@ -133,15 +147,23 @@ gotchas = ["Steam drops old builds: keep_releases is your only way back.", "..."
 docs = ["flk help --all  (Config: [build] args)", "flk help releases"]
 
 [[next]]                      # next steps this snippet implies, after render
+kind = "run"                  # run | root | pending | gap: the report's parts (8, step 13)
+order = 50                    # run steps sort by it: launch is 0, volumes 20, deploy 100
 text = "Pin the current build: look it up on api.steamcmd.net and set build_id"
+why = "..."                   # shown after the step
 when = '{{eq .P.build_id "latest"}}'
 ```
 
 Params types: `string`, `int`, `bool`, `enum`, `list`, `port`, `size`
 (memory/disk such as `"6gb"`), `duration` (`"5m"`), `regex`, and `secret`
-(only the name is recorded; the value never is). Each param has `prompt`,
-`hint`, `default`, `required` and optional `validate` (a regex, or a range
-for ints).
+(only the name is recorded; the value never is), and `map` (a table of
+strings, for `[env]`). Each param has `prompt`, `hint`, `default`,
+`required`, and optionally `values` (enum), `validate` (a regex for
+strings) and `min`/`max` (ints).
+
+A base snippet has a `[base]` table: `image` (a template; always a full
+name), `family` (apt, apk, dnf), `user` (the image's uid-1000 user, if
+any), `clear_entrypoint`, and `busybox` (no setpriv: rule 6.4).
 
 ## 5. Recipe format (`flkforge.toml`)
 
@@ -213,26 +235,44 @@ doesn't invalidate the expensive layers. Say so in a hint.
 
 ### 6.2 flk.toml
 
-Fragments are structured records, not TOML text: `table` (a dotted path,
-or `[[name]]` with an entry key for arrays of tables), `key`, `value`
-(a TOML value after templating), and an optional `comment`. A record
-with no key and only a comment gives a table its leading comment. Merging
-works on records: tables merge, entries of arrays of tables
-(`[[services]]`, `[[mounts]]`) append, and a scalar set twice is a
-conflict unless the snippet declares a merge rule (`max` for
-`kill_timeout`, for example). Records were chosen (2026-11-04) over
-merging TOML text because a TOML parser drops comments, and keeping the
-comments is the point. Output comes from flkforge's own writer, not
+Fragments are commented TOML text, as an admin would write it. After
+templating, `internal/flktoml` parses each one into records (tables, keys
+with their values, and the comments above and after them) with its own
+parser for the subset flk.toml uses: comments, `[table]` and `[[array]]`
+headers, and one-line values (arrays may span lines). Dotted keys and
+multi-line strings are refused, and every value is checked with a real
+TOML parser. (Decided 2026-11-04, in M0: a generic TOML parser drops
+comments, and keeping them is the point; writing fragments as
+key/value records instead was tried on paper and is clumsy for nested
+`[[services.ports]]`.) Merging works on the records: tables merge, arrays
+of tables (`[[services]]`, `[[mounts]]`) append, a key set twice to the
+same value is fine, and to different values it's a conflict unless a
+snippet declares a merge rule in `[merge]` (`max` for
+`kill_timeout`). Output comes from flkforge's own writer, not
 a generic TOML encoder, so it keeps the comments from the fragments and
 uses the house section order (primer section 5). Any keys outside the
 known order go at the end. `[env]` keeps the order of the snippets that
-set it, with a comment line naming the snippet that owns each group.
+set it, and a commented group from a new snippet gets a blank line
+before it. Every generated flk.toml and Dockerfile opens with two
+comment lines saying it was made from `flkforge.toml`. The real apps'
+flk.toml files survive a parse and format with their meaning and every
+comment intact (`internal/flktoml` tests).
 
 ### 6.3 Extra files
 
-`files/` templates render into the app directory: the run wrapper (mode
-755), a `.dockerignore`, `site.env.example`. A file that already exists
-and wasn't written by flkforge is never overwritten (section 6.5).
+`[[file]]` entries render into the app directory: the run wrapper (mode
+755), a `.dockerignore`, `site.env.example`. Each is one of two kinds:
+
+- **managed** (the default): flkforge's. Re-rendered every time, its hash
+  goes in the recipe's `[render]`, and a hand edit is drift (6.5). A file
+  the last render wrote and no snippet writes any more is removed if
+  it's unchanged, and left with a note if it was edited.
+- **seed**: written once, when missing, and the admin's from then on
+  (a start script, the run engine's hooks): no hash, no drift, never
+  overwritten.
+
+A file that already exists and wasn't written by flkforge is never
+overwritten (section 6.5).
 
 ### 6.4 Rules
 
@@ -269,10 +309,14 @@ real apps' history:
 
 ### 6.5 Drift and re-rendering
 
-`render` records each file's hash in the recipe. On the next render, a file
-whose hash no longer matches was edited by hand. flkforge then doesn't
-overwrite it: it writes `FILE.flkforge-new`, shows a diff, and exits 1,
-unless `--force` is given. `check` reports drift without writing anything.
+`render` records each managed file's hash in the recipe. On the next
+render, a file whose hash no longer matches was edited by hand (or was
+there before flkforge). flkforge then writes nothing but
+`FILE.flkforge-new`, names the `diff -u` to run, and exits 1, unless
+`--force` is given. A render is all or nothing: with any drift, a rule
+error or a flk warning, no file is changed. `check` reports drift without
+writing anything. The new flk.toml is checked with `flk config show`
+in a scratch directory before anything is written.
 
 ### 6.6 The run engine (`flk-run`) and its hooks
 
@@ -440,22 +484,27 @@ Works at 80 columns: the preview drops below the form when narrow.
 
 ## 9. CLI
 
-    flkforge new [DIR] [--template T] [--recipe FILE] [--yes] [--force]
+    flkforge new [DIR] [--template T] [--recipe FILE] [--app NAME] [--yes] [--force] [--allow-warnings] [--json]
     flkforge edit [DIR]
-    flkforge render [DIR] [--force] [--allow-warnings] [--json]
+    flkforge render [DIR] [--force] [--allow-warnings] [--dry-run] [--json]
     flkforge check [DIR] [--json]
     flkforge add SNIPPET [--id ID] [--set K=V ...] [DIR]      add to a recipe, then render
     flkforge rm ID [DIR]
     flkforge set ID K=V ... [DIR]
-    flkforge snippets [list] [--category C] [--json]
+    flkforge snippets [list] [--category C] [--dir DIR] [--json]
     flkforge snippets show ID [--json]
     flkforge templates [--json]
     flkforge explain SNIPPET|RULE|KEY        hints in full; KEY = a flk.toml key such as kill_timeout
     flkforge help [COMMAND] | help --all [--json]
     flkforge version
 
+Built so far (M0): `new` (with `--recipe`), `render`, `check`,
+`snippets` (list), `help`, `version`. `help --all --json` carries a
+`schema` number (1), like flk's.
+
 `new --recipe FILE --yes` builds a whole app without a terminal (the
-agent path). With no TTY, `new` and `edit` refuse and name this form.
+agent path). `--app` overrides the recipe's app name (a shared recipe,
+or a `flkt-` test name); without either, the name comes from DIR. With no TTY, `new` and `edit` refuse and name this form.
 Commands that change something end with a `Next:` line, as flk's do.
 Exit codes: 0 ok, 1 failed or needs attention, 2 bad usage. Copy flk's
 approach of keeping commands and options in one table that drives parsing
@@ -499,3 +548,7 @@ recipe's `[[vm]]` gives; fly.io deployment.
   holds only the flkforge version while every snippet is built in (5,
   10). The milestones were reordered in PLAN.md: CLI and agents first,
   a vertical slice first, the wizard last.
+- 2026-11-04 (M0): flk.toml fragments are commented TOML text parsed into
+  records by flkforge's own parser (6.2), not records written by hand;
+  the snippet format settled (4); managed and seed files (6.3); render is
+  all or nothing (6.5); `new --app`, `render --dry-run`, `snippets --dir`.

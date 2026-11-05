@@ -1,0 +1,100 @@
+# flk.toml: the primary Fabric Minecraft server as a Firecracker microVM.
+#
+# The "world" volume is a copy of /data/minecraft/primary-minecraft, stored as
+# /data/minecraft/flk/world.ext4. The volume record in flk's volumes.json was
+# hand-edited to point there. The original folder is never touched by the VM.
+app = "minecraft-flk"
+
+# Saving a big world on shutdown takes a while. Give the server time before
+# flk kills the VM.
+kill_timeout = 120
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  TZ = "America/Anchorage"  # match the old server's logs and saved timestamps
+
+  # mc-run (see mc-run for details)
+  MC_HEAP = "8G"            # -Xms/-Xmx
+  # G1 tuning ("Aikar's flags"), compact object headers (Java 25) and a
+  # pre-touched heap. Tested on this image's Java 25.0.4.1 (docs/host-performance.md).
+  MC_JAVA_OPTS = "-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1 -XX:+UseCompactObjectHeaders"
+  RESTART_DELAY = "10"      # seconds before restarting after a crash
+  MAX_RESTARTS = "5"        # give up after this many restarts...
+  RESTART_WINDOW = "600"    # ...within this many seconds
+  STOP_TIMEOUT = "100"      # wait for `stop` this long, then SIGTERM (< kill_timeout)
+
+  # Events (start/stop, join/leave, deaths) are `[gamebus] {json}` lines on
+  # the console; the gamebus hub on the host publishes them to MQTT and,
+  # if it has a webhook for this game, Discord (~/m.gamebus/gamebus.toml).
+
+# mc-run restarts the server itself and gives up on a crash loop (exits 1).
+# flk's restart policy is only the outer net, for failures mc-run can't
+# handle (mc-run killed, guest kernel panic): restart the VM once, and if it
+# fails again right away, leave it stopped for a human. flk's default (10
+# retries) would multiply mc-run's restarts and hammer a crash-looping world.
+[[restart]]
+  policy = "on-failure"
+  retries = 1
+
+# flk volumes backup: copy the world while the server runs. save-off stops
+# autosaves, save-all flush writes everything out (wait for it: a big world
+# takes a while), and save-on always runs afterwards, even if the backup
+# failed. Console lines, not bin/mc-cmd: RCON gives up after 10s.
+[flk.backup]
+  mode = "live"
+  pre = [
+    { console = "save-off" },
+    { console = "save-all flush", wait = "Saved the game", timeout = 300 },
+  ]
+  post = [{ console = "save-on" }]
+  # Every backup (and `flk volumes verify`) must hold the world, not just a
+  # clean filesystem: level.dat, the region files, the server jar.
+  verify = "bin/mc-verify-backup"
+  # Deploys back up the world while the machine is stopped for the update
+  # (~25s more downtime). A deploy that fails its health checks then puts the
+  # world back with the old release; `flk releases rollback --with-volumes`
+  # can use these later.
+  before_deploy = true
+
+# Health checks: a deploy (or releases rollback) must bring the server fully
+# up, Java and Bedrock, within 5 minutes, or flk puts the previous release
+# back. Only the image and this file roll back, not the world volume (where
+# the Minecraft jars and mods live).
+[checks.ready]
+  type = "log"
+  match = 'Started Geyser on UDP port 19132'   # after the server's own "Done ("
+  grace_period = "5m"
+[checks.port]
+  type = "tcp"
+  port = 25565
+  grace_period = "5m"
+
+[flk]
+  keep_releases = 3        # images kept for flk releases rollback (default 2)
+
+[[vm]]
+  cpus = 4
+  memory = "11gb"          # JVM heap is 8G (-Xms8G -Xmx8G in the Dockerfile)
+
+[[mounts]]
+  source = "world"
+  destination = "/server"  # the server folder: fabric-server.jar, mods, world2-201803
+
+# Java Edition
+[[services]]
+  internal_port = 25565
+  protocol = "tcp"
+  [[services.ports]]
+    port = 25565
+
+# Bedrock Edition via Geyser
+[[services]]
+  internal_port = 19132
+  protocol = "udp"
+  [[services.ports]]
+    port = 19132
+
+# RCON (25576) is not forwarded; reach it from the host at the machine's
+# 172.30.0.x address (flk status).

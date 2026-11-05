@@ -1,0 +1,48 @@
+# flk's examples/hello as a recipe: the M0 golden test (PLAN M0).
+flkforge = "0.1.0"
+app = "hello"
+
+[[use]]
+  snippet = "core/base-alpine"
+  params = { version = "3.20" }
+
+[[use]]
+  snippet = "core/packages"
+  params = { list = ["busybox-extras"] }
+
+[[use]]
+  snippet = "core/start-script"
+  [use.params]
+    body = '''
+#!/bin/sh
+# Demo: env, secrets, and a volume that survives redeploys.
+set -e
+n=$(( $(cat /data/boots 2>/dev/null || echo 0) + 1 ))
+echo "$n" > /data/boots
+mkdir -p /www
+cat > /www/index.html <<HTML
+<h1>Hello from $FLK_HOSTNAME</h1>
+<p>machine $FLK_MACHINE_ID, app $FLK_APP_NAME, release $FLK_RELEASE</p>
+<p>GREETING=$GREETING</p>
+<p>API_TOKEN secret present: ${API_TOKEN:+yes}</p>
+<p>boots recorded on /data volume: $n</p>
+HTML
+echo "serving on :8080 (boot #$n)"
+exec httpd -f -v -p 8080 -h /www
+'''
+
+[[use]]
+  snippet = "core/env"
+  params = { vars = { GREETING = "hi from flk" } }
+
+[[use]]
+  snippet = "core/http-service"
+  params = { port = 8080 }
+
+[[use]]
+  snippet = "core/vm"
+  params = { size = "shared-cpu-1x" }
+
+[[use]]
+  snippet = "core/volume"
+  params = { name = "data", path = "/data" }

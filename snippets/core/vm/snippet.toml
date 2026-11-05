@@ -1,0 +1,41 @@
+id = "core/vm"
+version = "0.1.0"
+title = "VM size"
+category = "vm"
+summary = "CPUs and memory for each machine."
+source = "~/flk/examples/reference/flk.toml"
+
+[params.size]
+type = "string"
+prompt = "A Fly size name, such as shared-cpu-1x (or set cpus and memory)"
+validate = '^[a-z0-9-]+$'
+
+[params.cpus]
+type = "int"
+min = 1
+prompt = "vCPUs"
+
+[params.memory]
+type = "size"
+prompt = "Memory, such as 256mb or 6gb"
+
+[[flktoml]]
+when = "{{if or .P.size .P.cpus .P.memory}}true{{end}}"
+text = '''
+[[vm]]
+{{- if .P.size}}
+  size = {{toml .P.size}}{{end}}
+{{- if .P.cpus}}
+  cpus = {{.P.cpus}}{{end}}
+{{- if .P.memory}}
+  memory = {{toml .P.memory}}{{end}}
+'''
+
+[hints]
+what = "Sets each machine's vCPUs and memory in [[vm]]."
+under_the_hood = """
+Each machine is a Firecracker VM with this many vCPUs and this much RAM,
+reserved while it runs. Without [[vm]], flk uses 1 vCPU and 256 MB.
+"""
+gotchas = ["Leave room above the app's own memory setting (a JVM heap, for instance): the kernel and init need some too."]
+docs = ["flk help --all  (Config: [[vm]])", "flk machine stats"]

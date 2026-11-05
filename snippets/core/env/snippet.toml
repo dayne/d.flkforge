@@ -1,0 +1,37 @@
+id = "core/env"
+version = "0.1.0"
+title = "Environment variables"
+category = "env"
+summary = "Plain settings in flk.toml's [env]. Never secrets: those go in flk secrets."
+multi = true
+source = "~/flk/examples/hello/flk.toml"
+
+[params.vars]
+type = "map"
+required = true
+prompt = "Variables (NAME = value)"
+hint = "Values are strings. Anything secret (a password, a token) is a secret instead: core/secret."
+
+[params.comment]
+type = "string"
+prompt = "A comment above the group (optional)"
+
+[[flktoml]]
+text = '''
+[env]
+{{- if .P.comment}}
+  # {{.P.comment}}{{end}}
+{{- range $k, $v := .P.vars}}
+  {{key $k}} = {{toml $v}}{{end}}
+'''
+
+[hints]
+what = "Sets environment variables for the app, in flk.toml's [env]."
+under_the_hood = """
+flk passes [env] to the machine's config drive, and init exports it before
+it runs the app, along with secrets and flk's own FLY_* / FLK_* variables
+(FLK_APP_NAME, FLK_MACHINE_ID, FLK_RELEASE...). A change takes effect on
+the next deploy.
+"""
+gotchas = ["flk.toml is meant to go in git: secrets never go in [env]."]
+docs = ["flk help --all  (Config: [env]; Machines: env inside)", "flk help secrets"]

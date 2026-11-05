@@ -324,7 +324,7 @@ func (m *Model) paramValue(rw row, focused bool, errs map[string]string) string 
 		if text == "" {
 			text, _ = p.Default.(string)
 		}
-		v = stDim.Render(fmt.Sprintf("(%d lines: edit the file after writing)", strings.Count(strings.TrimRight(text, "\n"), "\n")+1))
+		v = stDim.Render(fmt.Sprintf("(%d lines: ctrl+o edits them in your editor)", strings.Count(strings.TrimRight(text, "\n"), "\n")+1))
 	case p.Type == "bool" || p.Type == "enum":
 		cur := f.String()
 		shown := cur
@@ -588,7 +588,11 @@ func (m *Model) hintLines(w, h int) []string {
 				case p.Required:
 					kind += ", required"
 				case p.Default != nil:
-					kind += ", default " + snippet.FormatValue(p, p.Default)
+					if d, ok := p.Default.(string); ok && strings.Contains(d, "\n") {
+						kind += fmt.Sprintf(", default: %d lines", strings.Count(strings.TrimRight(d, "\n"), "\n")+1)
+					} else {
+						kind += ", default " + snippet.FormatValue(p, p.Default)
+					}
 				}
 				add(stBold.Render(rw.use+"."+rw.param) + " (" + kind + "): " + p.Prompt)
 				if p.Hint != "" {
@@ -687,6 +691,9 @@ Editing
   ←/→, space               change a choice or a yes/no
   enter on "+ add…"        add a snippet; one that conflicts with a snippet
                            already there replaces it (a backup mode, a base)
+  ctrl+o                   edit a text value in your editor ($VISUAL,
+                           $EDITOR or vi): the way to change a multi-line
+                           one, such as a start script's body
   ctrl+d                   remove the focused snippet
 
 Seeing

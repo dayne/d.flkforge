@@ -558,7 +558,9 @@ golden tests (lazyflk's way). Decided 2026-11-05; huh isn't a dependency.
   without that use, and the difference marked), and the preview follows
   it to the first file it changes.
 - Multi-line params (a start script's body) aren't edited in a one-line
-  field: they say so, and the file is the admin's after writing.
+  field: ctrl+o opens the value in $VISUAL, $EDITOR or vi (bubbletea
+  hands the terminal over and takes it back). After writing, a seed file
+  is the admin's anyway.
 - Review: the Write button first, then the files, the rules' findings,
   `flk config show`'s verdict (run in the background), whether the app
   name is already registered, the flk commands to run and the to-dos.
@@ -568,7 +570,8 @@ golden tests (lazyflk's way). Decided 2026-11-05; huh isn't a dependency.
 - Keys: tab/↓ and shift+tab/↑ move; ctrl+n/ctrl+p (pgdown/pgup; `]`/`[`
   outside a text field) change step; typing edits, ctrl+u clears; ←/→
   or space change a choice; ctrl+d removes the focused snippet; ctrl+f
-  cycles the preview's file; ctrl+t cycles the hints (full, summary,
+  cycles the preview's file; ctrl+o edits a text value in your editor;
+  ctrl+t cycles the hints (full, summary,
   minimal: never hidden); F1 or `?` (outside a text field) is help; esc
   or ctrl+c quits, twice when nothing is written yet. Letters can't be
   commands while a text field has focus, hence the ctrl keys (the

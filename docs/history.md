@@ -223,3 +223,15 @@ Acceptance (PLAN M4):
   the first missing param (counting rows by hand was error-prone, so it
   would be for people too); long directories in the header and the
   button; the preview column was too narrow at 160.
+
+## 2026-11-05: after M4 (while Dayne was away)
+
+- Drift: a refused render shows the diff of each hand-edited file (text,
+  and `diff` in --json), and Next says how to keep the change (put it in
+  the recipe, then render --force) or drop it. The M2 TODO.
+- Reports list the ports (host 2476/udp -> VM 2466/udp), as M2's agent
+  asked.
+- Wizard: ctrl+o edits a text value in $VISUAL/$EDITOR/vi, the way to
+  change a multi-line one (a start script's body). Tested with a hook,
+  and in tmux with a script as the editor: the terminal went over and
+  back, and the body and preview changed.

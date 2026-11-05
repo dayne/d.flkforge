@@ -1,6 +1,7 @@
 package wizard
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -153,8 +154,25 @@ func TestMultilineIsReadOnly(t *testing.T) {
 	if _, ok := u.Params["body"]; ok {
 		t.Error("typing changed a multi-line param")
 	}
-	if !strings.Contains(screen(m), "lines: edit the file after writing") {
+	if !strings.Contains(screen(m), "ctrl+o edits them") {
 		t.Errorf("not shown as multi-line:\n%s", screen(m))
+	}
+}
+
+func TestEditorEditsMultiline(t *testing.T) {
+	m := sized(newWizard(t, Options{RunEditor: func(editor, path string) error {
+		return os.WriteFile(path, []byte("#!/bin/sh\nexec httpd -f -p 8080\n"), 0o644)
+	}}), 80, 24)
+	pickTemplate(t, m, "core/web-service")
+	goStep(t, m, "Process")
+	focusParam(t, m, "start-script", "body")
+	press(m, "ctrl+o")
+	u, _ := m.snippetOf("start-script")
+	if u.Params["body"] != "#!/bin/sh\nexec httpd -f -p 8080\n" {
+		t.Errorf("body = %q", u.Params["body"])
+	}
+	if !strings.Contains(m.res.File("start.sh").String(), "exec httpd") {
+		t.Error("the preview didn't follow")
 	}
 }
 

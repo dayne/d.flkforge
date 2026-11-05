@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"fmt"
+	"os"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -27,6 +28,7 @@ func (c *ctx) runWizard(dir string, r *recipe.Recipe, template string, edit bool
 	var lastReport string
 	o := wizard.Options{
 		Catalog: cat, Dir: dir, Recipe: r, Template: template, Edit: edit, Hints: c.opt("hints"),
+		Editor: firstSet(os.Getenv("VISUAL"), os.Getenv("EDITOR"), "vi"),
 		Write: func(nr *recipe.Recipe) (string, bool, error) {
 			var out *forge.Outcome
 			var err error
@@ -83,4 +85,13 @@ func cmdEdit(c *ctx) int {
 		return c.errorf("%v (flkforge new starts an app)", err)
 	}
 	return c.runWizard(dir, r, "", true)
+}
+
+func firstSet(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }

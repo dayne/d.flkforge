@@ -683,3 +683,6 @@ func foundElsewhere(res *Result, self, text string) bool {
 	}
 	return false
 }
+
+// String is the file's content.
+func (f *File) String() string { return string(f.Content) }

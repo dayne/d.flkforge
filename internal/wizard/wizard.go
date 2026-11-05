@@ -9,6 +9,8 @@ package wizard
 import (
 	"errors"
 	"fmt"
+	"os"
+	"os/exec"
 	"slices"
 	"sort"
 	"strings"
@@ -41,6 +43,11 @@ type Options struct {
 	// Taken says where an app name is already registered with flk ("" if
 	// it isn't), nil: unknown.
 	Taken func(app string) string
+	// Editor is the command for editing a multi-line value ($VISUAL,
+	// $EDITOR, else vi). RunEditor, if set, runs it instead of handing
+	// the terminal over (tests).
+	Editor    string
+	RunEditor func(editor, path string) error
 }
 
 // A step of the wizard (SPEC 8). Category steps edit the recipe's uses of
@@ -647,6 +654,32 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.res != nil && string(m.res.File("flk.toml").Content) == msg.content {
 			m.validated, m.flkWarn, m.flkErr = true, msg.warnings, msg.err
 		}
+	case editedMsg:
+		if msg.err != nil {
+			m.status = "editor: " + msg.err.Error()
+			break
+		}
+		u, s := m.snippetOf(msg.use)
+		if u == nil || s == nil {
+			break
+		}
+		if msg.text == msg.before {
+			m.status = "unchanged"
+			break
+		}
+		if strings.Contains(msg.text, "\n") {
+			if u.Params == nil {
+				u.Params = map[string]any{}
+			}
+			u.Params[msg.param] = msg.text
+			delete(m.fields, fieldKey(msg.use, msg.param))
+			m.dirty = true
+			m.status = "set " + msg.use + "." + msg.param + " from the editor"
+			m.rerender()
+		} else {
+			m.paramField(msg.use, msg.param).set(strings.TrimSpace(msg.text))
+			m.setParam(msg.use, msg.param)
+		}
 	case writtenMsg:
 		m.phase = done
 		m.report, m.refused = msg.report, msg.refused
@@ -712,6 +745,11 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return nil
 	case "f1":
 		m.help = true
+		return nil
+	case "ctrl+o":
+		if rw := m.rows[m.focus]; rw.kind == rowParam {
+			return m.openEditor(rw)
+		}
 		return nil
 	case "ctrl+f":
 		if m.preview != nil && len(m.preview.Files) > 0 {
@@ -975,4 +1013,59 @@ func placeholder(p *snippet.Param) any {
 		}
 	}
 	return nil
+}
+
+type editedMsg struct {
+	use, param   string
+	text, before string
+	err          error
+}
+
+// openEditor edits a param's value in the admin's editor: the way to
+// change a multi-line value (a start script's body).
+func (m *Model) openEditor(rw row) tea.Cmd {
+	u, s := m.snippetOf(rw.use)
+	if u == nil || s == nil {
+		return nil
+	}
+	p := s.Params[rw.param]
+	var text string
+	switch v := u.Params[rw.param].(type) {
+	case string:
+		text = v
+	case nil:
+		text, _ = p.Default.(string)
+	default:
+		text = snippet.FormatValue(p, v)
+	}
+	if p.Type != "string" && !strings.Contains(text, "\n") {
+		m.status = "ctrl+o is for text values; type this one in its field"
+		return nil
+	}
+	f, err := os.CreateTemp("", "flkforge-"+rw.use+"-"+rw.param+"-*.txt")
+	if err != nil {
+		m.status = err.Error()
+		return nil
+	}
+	path := f.Name()
+	f.WriteString(text)
+	f.Close()
+	editor := m.o.Editor
+	if editor == "" {
+		editor = "vi"
+	}
+	done := func(err error) tea.Msg {
+		defer os.Remove(path)
+		b, rerr := os.ReadFile(path)
+		if err == nil {
+			err = rerr
+		}
+		return editedMsg{use: rw.use, param: rw.param, text: string(b), before: text, err: err}
+	}
+	if m.o.RunEditor != nil {
+		return func() tea.Msg { return done(m.o.RunEditor(editor, path)) }
+	}
+	parts := strings.Fields(editor)
+	cmd := exec.Command(parts[0], append(parts[1:], path)...)
+	return tea.ExecProcess(cmd, done)
 }

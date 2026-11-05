@@ -88,8 +88,6 @@ What's known so far:
 
 ## From M4
 
-- Wizard: editing a multi-line param (a start script's body) in $EDITOR
-  (tea.ExecProcess), instead of "edit the file after writing".
 - Wizard: the mouse (click a step, a field, a preview tab).
 - Wizard: a step's snippets could show their own short summary under the
   header at the summary hint level; at 80x24 the form has room for ~8 rows.

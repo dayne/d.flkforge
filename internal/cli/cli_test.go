@@ -207,17 +207,29 @@ func TestDrift(t *testing.T) {
 	out, _, code := run(t, noFlk, false, "render", dir, "--json")
 	var res struct {
 		Refused string
-		Files   []struct{ Path, Status string }
-		Next    string
+		Files   []struct {
+			Path, Status string
+			Diff         []string
+		}
+		Next string
 	}
 	if err := json.Unmarshal([]byte(out), &res); err != nil {
 		t.Fatal(err, out)
 	}
-	if code != exitFail || res.Refused == "" || !strings.Contains(res.Next, "diff -u flk.toml flk.toml.flkforge-new") {
+	if code != exitFail || res.Refused == "" || !strings.Contains(res.Next, "render --force") {
 		t.Errorf("render after a hand edit: exit %d\n%s", code, out)
 	}
 	if b, _ := os.ReadFile(path); string(b) != edited {
 		t.Error("the hand-edited file was overwritten")
+	}
+	diffShown := false
+	for _, f := range res.Files {
+		for _, l := range f.Diff {
+			diffShown = diffShown || l == `-  GREETING = "edited"`
+		}
+	}
+	if !diffShown {
+		t.Errorf("no diff of the edit in --json: %+v", res.Files)
 	}
 	if _, err := os.Stat(path + ".flkforge-new"); err != nil {
 		t.Error("no flk.toml.flkforge-new")

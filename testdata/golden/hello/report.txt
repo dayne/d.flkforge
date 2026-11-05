@@ -6,6 +6,8 @@ Written:
   start.sh       written  start-script: yours from now on: flkforge won't overwrite it
   flkforge.toml  written  the recipe: what to render, and hashes of what was written
 
+Ports: VM 8080/tcp (http, machine IP only)
+
 flk config show: not checked with flk: file does not exist
 
 Not in effect yet:

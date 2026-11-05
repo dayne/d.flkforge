@@ -32,7 +32,7 @@ func cmdRender(c *ctx) int {
 func next(out *forge.Outcome, rep forge.Report) string {
 	if out.Refused != "" {
 		if d := out.Drift(); len(d) > 0 {
-			return fmt.Sprintf("cd %s && diff -u %s %s.flkforge-new", out.Dir, d[0].Path, d[0].Path)
+			return fmt.Sprintf("to keep your change, put it in the recipe (flkforge set, add, rm), then flkforge render --force %s; to drop it, just flkforge render --force %s", out.Dir, out.Dir)
 		}
 		return ""
 	}
@@ -96,6 +96,17 @@ func (c *ctx) report(out *forge.Outcome, dry bool) int {
 		fmt.Fprintf(tw, "  %s\t%s\t%s\n", f.Path, status, detail)
 	}
 	tw.Flush()
+	for _, f := range out.Files {
+		if len(f.Diff) > 0 {
+			fmt.Fprintf(w, "\n%s, yours (-) and the new version (+):\n", f.Path)
+			for _, l := range f.Diff {
+				fmt.Fprintln(w, "  "+l)
+			}
+		}
+	}
+	if len(out.Ports) > 0 && out.Refused == "" {
+		fmt.Fprintln(w, "\nPorts: "+strings.Join(out.Ports, "; "))
+	}
 
 	switch {
 	case !out.FlkChecked:

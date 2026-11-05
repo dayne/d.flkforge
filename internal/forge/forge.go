@@ -15,6 +15,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/BurntSushi/toml"
+
 	"github.com/dayne/d.flkforge/internal/flk"
 	"github.com/dayne/d.flkforge/internal/recipe"
 	"github.com/dayne/d.flkforge/internal/render"
@@ -52,6 +54,8 @@ type FileStatus struct {
 	From   []string `json:"snippets"` // the uses behind it
 	Status string   `json:"status"`   // written, unchanged, kept, drift, removed, left
 	Note   string   `json:"note,omitempty"`
+	// Diff: for a drifted file, how the new version differs from yours.
+	Diff []string `json:"diff,omitempty"`
 }
 
 // Outcome is the result of a render.
@@ -62,6 +66,8 @@ type Outcome struct {
 	Findings []render.Finding `json:"findings"`
 	Steps    []render.Step    `json:"-"`
 	// Flk: what flk config show said about the new flk.toml.
+	// Ports: how the app is reached (host port -> VM port), from flk.toml.
+	Ports       []string `json:"ports"`
 	FlkChecked  bool     `json:"flk_checked"`
 	FlkWarnings []string `json:"flk_warnings"`
 	FlkNote     string   `json:"flk_note,omitempty"`
@@ -99,7 +105,7 @@ func (e *Env) Render(dir string, r *recipe.Recipe, opts RenderOpts) (*Outcome, e
 	if err != nil {
 		return nil, err
 	}
-	out := &Outcome{Dir: dir, App: r.App, Findings: res.Findings, Steps: res.Steps}
+	out := &Outcome{Dir: dir, App: r.App, Findings: res.Findings, Steps: res.Steps, Ports: ports(res.File("flk.toml").Content)}
 	e.hostSteps(dir, out)
 	out.Steps = editedSteps(dir, res, out.Steps)
 	if errs := res.Errors(); len(errs) > 0 {
@@ -156,6 +162,7 @@ func (e *Env) Render(dir string, r *recipe.Recipe, opts RenderOpts) (*Outcome, e
 				st.Note = "changed by hand since the last render"
 			}
 			st.Note += "; the new version is in " + f.Path + ".flkforge-new"
+			st.Diff = Diff(f.Path+" (yours)", f.Path+".flkforge-new", string(disk), string(f.Content), 2, 60)
 			writes = append(writes, write{full + ".flkforge-new", f.Content, f.Mode})
 		default:
 			st.Status = "written"
@@ -408,4 +415,52 @@ func (e *Env) ValidateFlkToml(content []byte) ([]string, error) {
 		return nil, fmt.Errorf("%s", out.FlkNote)
 	}
 	return out.FlkWarnings, nil
+}
+
+// ports describes how the app is reached, from its flk.toml.
+func ports(flkToml []byte) []string {
+	var cfg struct {
+		HTTPService *struct {
+			InternalPort int `toml:"internal_port"`
+		} `toml:"http_service"`
+		Flk struct {
+			HTTPPort int    `toml:"http_port"`
+			Bind     string `toml:"bind"`
+		} `toml:"flk"`
+		Services []struct {
+			InternalPort int    `toml:"internal_port"`
+			Protocol     string `toml:"protocol"`
+			Ports        []struct {
+				Port int `toml:"port"`
+			} `toml:"ports"`
+		} `toml:"services"`
+	}
+	out := []string{}
+	if _, err := toml.Decode(string(flkToml), &cfg); err != nil {
+		return out
+	}
+	on := ""
+	if cfg.Flk.Bind != "" {
+		on = " on " + cfg.Flk.Bind
+	}
+	for _, s := range cfg.Services {
+		proto := s.Protocol
+		if proto == "" {
+			proto = "tcp"
+		}
+		for _, p := range s.Ports {
+			out = append(out, fmt.Sprintf("host %d/%s%s -> VM %d/%s", p.Port, proto, on, s.InternalPort, proto))
+		}
+		if len(s.Ports) == 0 {
+			out = append(out, fmt.Sprintf("VM %d/%s (machine IP only)", s.InternalPort, proto))
+		}
+	}
+	if h := cfg.HTTPService; h != nil {
+		if cfg.Flk.HTTPPort > 0 {
+			out = append(out, fmt.Sprintf("host %d/tcp%s -> VM %d/tcp (http)", cfg.Flk.HTTPPort, on, h.InternalPort))
+		} else {
+			out = append(out, fmt.Sprintf("VM %d/tcp (http, machine IP only)", h.InternalPort))
+		}
+	}
+	return out
 }

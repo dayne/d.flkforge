@@ -73,3 +73,5 @@ the check-log hint says not to use one.
 **Asked:** match line by line with trailing `\r` removed (e.g.
 `tail.each_line.any? { _1.chomp.delete_suffix("\r")... }`, or strip `\r`
 before matching), or document it in `flk help --all` ([checks.NAME]).
+
+Status: fixed in flk a8461a0 (branch r1-reliability, not on main yet): `check_passes?` deletes "\r" before matching, like the reader behind `console --wait-log`, so `^...$` work per line. Documented under [checks.NAME]. Test: `tests/cases/05-cli.sh` test_log_check_regex_anchors (real "\r\r\n" line ends).

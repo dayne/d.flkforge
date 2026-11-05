@@ -92,6 +92,7 @@ func rules(uses []*use, base *use, app App, res *Result) []Finding {
 
 	// flk matches log checks against the raw console text, where lines end
 	// in "\r\r\n": a regex anchored with $ never matches (BUGS.flk.md #2).
+	// Fixed in flk a8461a0 (r1-reliability): remove once main has it.
 	for name, c := range checks {
 		ct, _ := c.(map[string]any)
 		if t, _ := ct["type"].(string); t != "log" {

@@ -148,3 +148,37 @@ Acceptance (PLAN M2):
   tested since M0 (`TestDrift`).
 - `check` also caught a real conflict during development: a trial broker
   on host port 1883, which mqtt-flk forwards.
+
+## 2026-11-04: M3 done (the rest of the catalog)
+
+Built: bases debian, temurin, dotnet, python, wine; download-sha256,
+checksum-manifest, git-pinned, pip, on-volume, steamcmd `single_stage`;
+idle-cmd, user-rename, volume-links, home-volume (flk-seed-home),
+site-env; bind, internal-hosts; backup-live-console, backup-verify;
+rootfs-extra, keep-releases, timezone; restart, copy-files, image-env;
+the escape hatches flk-toml and dockerfile-lines. run-wrapper
+`kill_margin`, restart-always `retries`. Rule jvm-heap. Templates
+java-server, dotnet-server, steam-game-windows, python-workbench,
+dev-sandbox. Next steps can be `unless_found`. 52 snippets, 9 templates.
+`sshd` deferred (TODO.md).
+
+Acceptance (PLAN M3):
+- Every template renders with no rule findings, passes flk config show
+  with no warnings, and has golden files (TestTemplatesGolden).
+- Reference recipes for all seven real apps: flk reads each rendered
+  flk.toml exactly like the real app's (parsed and machine_config, apart
+  from flk-run's RUN_* env), TestReferenceApps; the Dockerfile
+  differences are explained in testdata/real/*.notes.md. Checking them
+  found that the Temurin and .NET images already ship tzdata (so
+  core/timezone's package is a no-op there), and that opencode's
+  Dockerfile uses a short image name (only builds where podman has
+  search registries).
+- web-service deployed as flkt-forge-web from the template (a package
+  added, start.sh filled in): v1 healthy, served the page from the
+  volume, check 10 ok, 0 warn, 0 FAIL. Destroyed.
+- Beyond the plan, dev-sandbox as flkt-forge-dev, to test home-volume's
+  claim: first boot seeded /home/dev from the image, the user was dev
+  with working sudo, and after a second deploy ~/.marker and the
+  workspace file were still there, not seeded again. Destroyed. It
+  turned up a false "run flk-seed-home" step (the template already
+  does), fixed with unless_found.

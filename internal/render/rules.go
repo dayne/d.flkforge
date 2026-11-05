@@ -55,6 +55,8 @@ var Rules = []Rule{
 		"Anything in the build context can end up in an image layer. Public keys only; private ones stay with their owner."},
 	{"guest-init", "warn", "Nothing in the image expects systemd or manages the network, hostname, /etc/hosts or /etc/resolv.conf.",
 		"flk's init is PID 1: there's no systemd, and init writes the hostname, /etc/hosts and /etc/resolv.conf at boot. Daemons run in the foreground, started by the app or its wrapper."},
+	{"jvm-heap", "warn", "The JVM heap fits inside the VM's memory, with at least 1 GB to spare.",
+		"The JVM uses memory beyond its heap (metaspace, threads, GC, direct buffers), and the kernel and init need some too. A heap too close to [[vm]] memory gets the server killed by the kernel's OOM killer under load."},
 	{"huge-pages", "warn", "huge_pages needs memory in whole 2 MB pages and a host pool.",
 		"flk takes the VM's memory from a hugetlbfs pool: the host needs vm.nr_hugepages large enough (a root step)."},
 }
@@ -199,11 +201,12 @@ func rules(uses []*use, base *use, app App, res *Result) []Finding {
 	for _, m := range list(cfg, "mounts") {
 		dest, _ := m["destination"].(string)
 		dest = path.Clean(dest)
-		if app.User != "" && app.User != "root" && !ownsDir(dockerfile, dest, app.User) {
+		seeded := dest == home && strings.Contains(dockerfile, "flk-seed-home")
+		if app.User != "" && app.User != "root" && dest != home && !ownsDir(dockerfile, dest, app.User) {
 			add("mount-owner", dest+" isn't created in the image owned by "+app.User+": a volume made without --owner stays root's, and the app can't write it",
 				"use core/volume (it does this), or RUN install -d -o "+app.User+" -g "+app.User+" "+dest)
 		}
-		if slices.Contains([]string{"/", "/home", "/root", "/usr", "/etc", "/opt", "/var", "/srv", home}, dest) {
+		if !seeded && slices.Contains([]string{"/", "/home", "/root", "/usr", "/etc", "/opt", "/var", "/srv", home}, dest) {
 			add("mount-hides", "a volume at "+dest+" hides what the image put there (home directories, installed tools, config)",
 				"mount it at a directory of its own (/data), or seed it at first boot")
 		}
@@ -229,6 +232,14 @@ func rules(uses []*use, base *use, app App, res *Result) []Finding {
 	if m := guest.FindString(dockerfile); m != "" {
 		add("guest-init", "the Dockerfile has "+strings.TrimSpace(m)+": there's no systemd, and flk's init writes the network files",
 			"run daemons in the foreground (the app or its run wrapper), and leave /etc/hosts, resolv.conf and the hostname to init")
+	}
+
+	if heap, src := jvmHeap(env, dockerfile); heap > 0 {
+		mem := vmMemory(list(cfg, "vm"))
+		if heap+1024 > mem {
+			add("jvm-heap", fmt.Sprintf("the JVM heap (%s: %d MB) leaves less than 1 GB of the VM's %d MB for everything else", src, heap, mem),
+				fmt.Sprintf("raise [[vm]] memory to %d MB or more (core/vm), or lower the heap", heap+1536))
+		}
 	}
 
 	for _, v := range list(cfg, "vm") {
@@ -311,4 +322,76 @@ func sortedKeys(m map[string]any) []string {
 	}
 	slices.Sort(keys)
 	return keys
+}
+
+var (
+	xmxRE  = regexp.MustCompile(`-Xmx([0-9]+)([kKmMgG]?)`)
+	sizeRE = regexp.MustCompile(`(?i)^\s*([0-9]+(?:\.[0-9]+)?)\s*(k|kb|m|mb|g|gb|t|tb)?\s*$`)
+)
+
+// jvmHeap finds the JVM's maximum heap in MB: -Xmx in [env] values or the
+// Dockerfile, or an env setting named *_HEAP (MC_HEAP = "8G").
+func jvmHeap(env map[string]any, dockerfile string) (int, string) {
+	for _, k := range sortedKeys(env) {
+		v, _ := env[k].(string)
+		if m := xmxRE.FindStringSubmatch(v); m != nil {
+			return sizeMB(m[1]+m[2], "m"), "[env] " + k + " -Xmx" + m[1] + m[2]
+		}
+		if strings.HasSuffix(k, "_HEAP") {
+			if mb := sizeMB(v, "m"); mb > 0 {
+				return mb, "[env] " + k + " = " + v
+			}
+		}
+	}
+	if m := xmxRE.FindStringSubmatch(dockerfile); m != nil {
+		return sizeMB(m[1]+m[2], "m"), "-Xmx" + m[1] + m[2] + " in the Dockerfile"
+	}
+	return 0, ""
+}
+
+// vmMemory is the first [[vm]]'s memory in MB (flk's default is 256).
+func vmMemory(vms []map[string]any) int {
+	if len(vms) == 0 {
+		return 256
+	}
+	v := vms[0]
+	if n, ok := v["memory_mb"].(int64); ok {
+		return int(n)
+	}
+	if s, ok := v["memory"].(string); ok {
+		return sizeMB(s, "m")
+	}
+	if n, ok := v["memory"].(int64); ok {
+		return int(n)
+	}
+	if s, ok := v["size"].(string); ok {
+		// Fly's sizes: shared-cpu-Nx and performance-Nx; flk maps them to
+		// memory (flk config show's machine_config has the exact number).
+		if strings.HasPrefix(s, "performance") {
+			return 2048
+		}
+	}
+	return 256
+}
+
+// sizeMB reads "8G", "11gb", "2048mb" or "512" (in defUnit) as MB.
+func sizeMB(s, defUnit string) int {
+	m := sizeRE.FindStringSubmatch(s)
+	if m == nil {
+		return 0
+	}
+	f, _ := strconv.ParseFloat(m[1], 64)
+	unit := strings.ToLower(m[2])
+	if unit == "" {
+		unit = defUnit
+	}
+	switch unit[0] {
+	case 'k':
+		f /= 1024
+	case 'g':
+		f *= 1024
+	case 't':
+		f *= 1024 * 1024
+	}
+	return int(f)
 }

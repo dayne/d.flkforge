@@ -4,6 +4,13 @@ updated: 2026-11-04
 
 # The starting catalog, and where each snippet comes from
 
+Built in M3 (2026-11-04): every row below except `sshd` (deferred:
+TODO.md), plus `base-image`, `copy-files`, `image-env`, `restart`,
+`check-tcp`, `secret`, `bind`, and the escape hatches `flk-toml` and
+`dockerfile-lines`. `gamebus-events` is part of `run-wrapper`. All nine
+templates exist, and each real app has a reference recipe in
+`testdata/real/` whose flk.toml flk reads exactly like the real one.
+
 Every v1 snippet comes from a pattern that already works on this host.
 Read the source file before writing the snippet: the comments in it
 explain *why*, and that's what the hints need. Ids are `core/...`; the
@@ -100,9 +107,6 @@ step; never a value), `kill-timeout`.
 | `python-workbench` | base-python, git-pinned, pip, volume-links | ncm.flk |
 | `dev-sandbox` | base-ubuntu, user-rename, idle-cmd, rootfs-extra; options: `home-volume`, `sshd`. Tools from system packages or pinned downloads, not `curl \| bash` into `~`, so `flk deploy` upgrades them and a home volume doesn't hide them | opencode.flk |
 | `blank` | a base only | |
-
-Built so far (M2): `blank`, `web-service` (with check-tcp until flk's
-http checks reach main), `daemon`, `steam-game`. The rest come in M3.
 
 The "Check it reproduces" column is the acceptance test (PLAN M1): a
 recipe for each real app must render a flk.toml whose

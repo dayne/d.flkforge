@@ -1,0 +1,50 @@
+title = "Java game server"
+summary = "A JVM server (Minecraft-style) whose files live on a volume: flk-run with a console stop, live backups with save hooks, log and TCP checks (like minecraft-flk)."
+
+[[use]]
+  snippet = "core/base-temurin"
+
+[[use]]
+  snippet = "core/run-wrapper"
+  params = { command = ["bash", "-c", "exec java -Xms$JAVA_HEAP -Xmx$JAVA_HEAP $JAVA_OPTS -jar \"$SERVER_JAR\" nogui"], stop = "console:stop", stop_timeout = 100, kill_margin = 20, hooks = ["watch"] }
+
+[[use]]
+  snippet = "core/user-1000"
+  params = { workdir = "/server" }
+
+[[use]]
+  snippet = "core/env"
+  params = { comment = "the server (see the run-wrapper command)", vars = { JAVA_HEAP = "4G", JAVA_OPTS = "-XX:+UseG1GC", SERVER_JAR = "server.jar" } }
+
+[[use]]
+  snippet = "core/volume"
+  params = { name = "world", path = "/server", holds = "the server folder: the jar, mods, config and world" }
+
+[[use]]
+  snippet = "core/on-volume"
+  params = { path = "/server" }
+
+[[use]]
+  snippet = "core/service"
+
+[[use]]
+  snippet = "core/check-log"
+  params = { grace = "5m" }
+
+[[use]]
+  snippet = "core/check-tcp"
+  params = { name = "port", grace = "5m" }
+
+[[use]]
+  snippet = "core/backup-live-console"
+  params = { pre = ["save-off", "save-all flush"], wait = "Saved the game", timeout = 300, post = ["save-on"] }
+
+[[use]]
+  snippet = "core/before-deploy"
+
+[[use]]
+  snippet = "core/restart-outer-net"
+
+[[use]]
+  snippet = "core/vm"
+  params = { cpus = 2, memory = "6gb" }

@@ -1,0 +1,57 @@
+id = "core/user-rename"
+version = "0.1.0"
+title = "Rename the uid-1000 user (sandboxes)"
+category = "user"
+summary = "Rename the base image's uid-1000 user and run as it, optionally with passwordless sudo."
+requires = ["category:base"]
+conflicts = ["core/user-1000"]
+source = "~/opencode.flk/Dockerfile (developer)"
+user = "{{.P.name}}"
+packages = '{{if .P.sudo}}sudo{{end}}'
+
+[params.name]
+type = "string"
+required = true
+prompt = "The new user name"
+validate = '^[a-z_][a-z0-9_-]*$'
+
+[params.sudo]
+type = "bool"
+default = false
+prompt = "Passwordless sudo (sandboxes only)"
+hint = "Anyone with flk exec on this host is root in the VM anyway (flk exec runs as root by default); sudo just saves typing for the user's own shell."
+
+[params.workdir]
+type = "string"
+prompt = "Working directory (default: the user's home)"
+validate = '^/'
+
+[[dockerfile]]
+slot = "install"
+text = '''
+{{- if not .App.BaseUser}}{{fail "core/user-rename: the base has no uid-1000 user to rename; use core/user-1000 with a name"}}{{end -}}
+# Rename the image's {{.App.BaseUser}} user (uid/gid 1000) to {{.P.name}}.
+RUN usermod -l {{.P.name}} {{.App.BaseUser}} \
+ && groupmod -n {{.P.name}} {{.App.BaseUser}} \
+ && usermod -d /home/{{.P.name}} -m {{.P.name}}
+{{- if .P.sudo}} \
+ && echo "{{.P.name}} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/{{.P.name}} \
+ && chmod 440 /etc/sudoers.d/{{.P.name}}{{end}}'''
+
+[[dockerfile]]
+slot = "user"
+text = '''
+ENV HOME=/home/{{.P.name}}
+USER {{.P.name}}
+WORKDIR {{if .P.workdir}}{{.P.workdir}}{{else}}/home/{{.P.name}}{{end}}'''
+
+[hints]
+what = "Renames the base's uid-1000 user and makes the app run as it."
+under_the_hood = """
+usermod -l and groupmod -n keep uid/gid 1000, so files and volumes made
+for uid 1000 still belong to the user under its new name; usermod -m
+moves the home directory. flk's init switches to the image's USER with
+setpriv before it runs the app.
+"""
+gotchas = ["sudo is for sandboxes: a server that needs root for one thing should do it at build time instead."]
+docs = ["flk help --all  (Machines: non-root USER)"]

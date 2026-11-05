@@ -1,0 +1,118 @@
+id = "core/download-sha256"
+version = "0.1.0"
+title = "Pinned download, checked by sha256"
+category = "fetch"
+summary = "A release tarball (from a URL, or a file in dist/) checked against its sha256 and unpacked into the image."
+multi = true
+requires = ["category:base"]
+source = "~/vintagestory.flk/Dockerfile (VS_VERSION / VS_SHA256)"
+packages = '{{if .P.url}}curl ca-certificates {{end}}{{if eq .P.format "zip"}}unzip{{end}}{{if eq .P.format "tar.xz"}}xz-utils{{end}}'
+
+[params.name]
+type = "string"
+required = true
+prompt = "A short name for the build args, in capitals (VS: VS_VERSION, VS_SHA256)"
+validate = '^[A-Z][A-Z0-9_]*$'
+
+[params.version]
+type = "string"
+required = true
+prompt = "The version to pin"
+validate = '^[A-Za-z0-9._+-]+$'
+
+[params.sha256]
+type = "string"
+required = true
+prompt = "The sha256 of the file for that version (sha256sum FILE)"
+validate = '^[0-9a-f]{64}$'
+
+[params.url]
+type = "string"
+prompt = "Download URL; ${NAME_VERSION} in it becomes the version (or use file)"
+validate = '^https?://'
+
+[params.file]
+type = "string"
+prompt = "Or a file in the app directory; ${NAME_VERSION} works here too (dist/server-${VS_VERSION}.tar.gz)"
+validate = '^[A-Za-z0-9._/${}-]+$'
+
+[params.format]
+type = "enum"
+values = ["tar.gz", "tar.xz", "zip", "file"]
+default = "tar.gz"
+prompt = "What it is: an archive to unpack, or a single file"
+
+[params.dest]
+type = "string"
+default = "/server"
+prompt = "Where it goes in the image"
+validate = '^/[A-Za-z0-9._/-]+$'
+
+[params.strip]
+type = "int"
+default = 0
+min = 0
+prompt = "Leading directories to strip from a tar archive"
+
+[params.args_in_flk_toml]
+type = "bool"
+default = true
+prompt = "Pin version and sha256 in flk.toml's [build] args (else in the Dockerfile's ARG defaults)"
+hint = "In flk.toml, an upgrade is an edit there; in the Dockerfile, it's an edit there. Either way, flk deploy builds the new one."
+
+[[dockerfile]]
+slot = "fetch"
+text = '''
+{{- if and (not .P.url) (not .P.file)}}{{fail "core/download-sha256: give url or file"}}{{end -}}
+# {{.P.name}}: pinned by version and sha256; a file that doesn't match fails the build.
+ARG {{.P.name}}_VERSION={{.P.version}}
+ARG {{.P.name}}_SHA256={{.P.sha256}}
+{{- if .P.url}}
+RUN curl -fsSL --retry 3 -o /tmp/{{.P.name}}.download "{{.P.url}}" \
+ && echo "${ {{- .P.name}}_SHA256}  /tmp/{{.P.name}}.download" | sha256sum -c - \
+{{- else}}
+COPY {{.P.file}} /tmp/{{.P.name}}.download
+RUN echo "${ {{- .P.name}}_SHA256}  /tmp/{{.P.name}}.download" | sha256sum -c - \
+{{- end}}
+ && mkdir -p {{.P.dest}} \
+{{- if eq .P.format "tar.gz"}}
+ && tar xzf /tmp/{{.P.name}}.download -C {{.P.dest}}{{if .P.strip}} --strip-components={{.P.strip}}{{end}} \
+{{- else if eq .P.format "tar.xz"}}
+ && tar xJf /tmp/{{.P.name}}.download -C {{.P.dest}}{{if .P.strip}} --strip-components={{.P.strip}}{{end}} \
+{{- else if eq .P.format "zip"}}
+ && unzip -q /tmp/{{.P.name}}.download -d {{.P.dest}} \
+{{- else}}
+ && cp /tmp/{{.P.name}}.download {{.P.dest}}/ \
+{{- end}}
+ && rm /tmp/{{.P.name}}.download \
+ && chown -R root:root {{.P.dest}}'''
+
+[[flktoml]]
+when = "{{.P.args_in_flk_toml}}"
+text = '''
+[build.args]
+  # {{.P.name}}: the pinned version and its sha256. Change both to upgrade.
+  {{.P.name}}_VERSION = {{toml .P.version}}
+  {{.P.name}}_SHA256 = {{toml .P.sha256}}
+'''
+
+[[next]]
+kind = "pending"
+when = "{{if .P.file}}true{{end}}"
+text = "{{.P.file}} (with ${ {{- .P.name}}_VERSION} = {{.P.version}}): yours to put in the app directory"
+why = "the build copies it from there and checks its sha256"
+
+[hints]
+what = "Downloads (or copies) one pinned file, checks its sha256, and unpacks it into the image."
+under_the_hood = """
+The version and sha256 are build ARGs. A file whose sha256 doesn't match
+fails the build, so a tampered or truncated download never becomes a
+release. Each release holds one exact version, and flk releases rollback
+brings an older one back. Files in dist/ stay on the host (keep dist/ out
+of git if they're large).
+"""
+gotchas = [
+  "Get the sha256 from the publisher when you can, not only from your own download.",
+  "The server files are root-owned in the image; what the server writes goes on a volume.",
+]
+docs = ["flk help --all  (Config: [build] args)", "flk help releases"]

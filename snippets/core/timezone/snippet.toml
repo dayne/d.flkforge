@@ -1,0 +1,29 @@
+id = "core/timezone"
+version = "0.1.0"
+title = "Time zone"
+category = "env"
+summary = "TZ in [env], and the tzdata package so the zone resolves."
+packages = "tzdata"
+source = "every game flk.toml (America/Anchorage)"
+
+[params.zone]
+type = "string"
+required = true
+prompt = "An IANA zone (America/Anchorage), or UTC"
+validate = '^[A-Za-z_]+(/[A-Za-z0-9_+-]+)*$'
+
+[[flktoml]]
+text = '''
+[env]
+  TZ = {{toml .P.zone}}
+'''
+
+[hints]
+what = "Sets TZ and installs tzdata."
+under_the_hood = """
+The VM's clock is UTC. TZ makes the app's local time (log timestamps, a
+server's daily restart) the zone you name; without tzdata in the image a
+zone name silently falls back to UTC.
+"""
+gotchas = ["flk's own log prefixes stay in the host's time."]
+docs = ["flk help --all  (Config: [env])"]

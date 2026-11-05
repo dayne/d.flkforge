@@ -1,0 +1,14 @@
+#!/bin/sh
+# flk-seed-home: fill the home volume from the image's copy at first boot.
+# Written by flkforge (core/home-volume). A volume mounted over the home
+# directory hides what the image put there; this copies it in once, then
+# leaves the volume alone (a .flk-seeded marker), so your files survive
+# every deploy.
+set -eu
+home=${HOME:?HOME not set}
+seed=/opt/flk-home-seed
+[ -e "$home/.flk-seeded" ] && exit 0
+[ -w "$home" ] || { echo "flk-seed-home: $home isn't writable by $(id -u); is the home volume mounted?" >&2; exit 1; }
+cp -a "$seed/." "$home/"
+date -u +%FT%TZ > "$home/.flk-seeded"
+echo "flk-seed-home: seeded $home from the image"

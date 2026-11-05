@@ -1,0 +1,29 @@
+id = "core/image-env"
+version = "0.1.0"
+title = "Image environment (Dockerfile ENV)"
+category = "env"
+summary = "ENV lines baked into the image, for settings that belong to the image rather than to the deploy."
+multi = true
+requires = ["category:base"]
+source = "~/ncm.flk/Dockerfile (HF_HOME)"
+
+[params.vars]
+type = "map"
+required = true
+prompt = "Variables (NAME = value)"
+
+[[dockerfile]]
+slot = "env"
+text = '''{{range $k, $v := .P.vars}}
+ENV {{$k}}={{json $v}}{{end}}'''
+
+[hints]
+what = "Adds ENV lines to the Dockerfile."
+under_the_hood = """
+ENV values are part of the image, so they're the same in every deploy
+and visible to build steps too. flk.toml's [env] (core/env) is set per
+deploy without a rebuild, and wins over the image's ENV when both set a
+name.
+"""
+gotchas = ["For anything you'd change between deploys, or per host, use core/env; for secrets, core/secret."]
+docs = ["flk help --all  (Config: [env])"]

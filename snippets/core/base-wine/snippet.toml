@@ -1,0 +1,53 @@
+id = "core/base-wine"
+version = "0.1.0"
+title = "Wine on steamcmd (Windows servers)"
+category = "base"
+summary = "The steamcmd image with wine64 and a Wine prefix made at build time: for Windows-only Steam servers."
+suggests = ["core/steamcmd"]
+source = "~/enshrouded.flk/Dockerfile"
+packages = "wine64 procps"
+
+[params.version]
+type = "string"
+default = "ubuntu-24"
+prompt = "steamcmd image tag"
+validate = '^[a-z0-9.-]+$'
+
+[base]
+image = "docker.io/steamcmd/steamcmd:{{.P.version}}"
+family = "apt"
+user = "ubuntu"
+clear_entrypoint = true
+
+[[dockerfile]]
+slot = "env"
+text = '''
+# Ubuntu's wine64 package keeps wine64 and wineserver in /usr/lib/wine.
+ENV PATH=/usr/lib/wine:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    WINEPREFIX=/home/ubuntu/.wine \
+    WINEARCH=win64 \
+    WINEDEBUG=-all \
+    WINEDLLOVERRIDES="mscoree,mshtml="
+
+# The Wine prefix is made at build time, so a boot doesn't spend a minute
+# on it. It lives in the image (per release), not on the volume.
+USER ubuntu
+RUN wine64 wineboot --init && wineserver -w && test -d "$WINEPREFIX/drive_c"
+USER root'''
+
+[hints]
+what = "Starts from the steamcmd image, adds wine64, and builds a 64-bit Wine prefix for ubuntu (uid 1000)."
+under_the_hood = """
+Windows-only dedicated servers run under wine64, headless (no X). The
+steamcmd image already has steamcmd, so core/steamcmd can download in this
+same image (single_stage = true) instead of copying a multi-GB server
+between stages. Wine turns SIGINT into Ctrl-C for the server, which is how
+most such servers save and stop: core/run-wrapper with stop =
+"signal:INT", escalate = "KILL" and escalate_cmd = "wineserver -k".
+"""
+gotchas = [
+  "The steamcmd image's own ENTRYPOINT is steamcmd: flkforge clears it.",
+  "Wine leaves wineserver running after a kill: escalate_cmd = \"wineserver -k\".",
+  "The prefix is per release, in the image: anything the server writes there is lost at the next deploy (point the server's save and config paths at the volume).",
+]
+docs = ["flk help --all  (Machines: stopping)", "~/enshrouded.flk (the M1 notes)"]

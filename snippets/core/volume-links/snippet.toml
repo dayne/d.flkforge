@@ -1,0 +1,36 @@
+id = "core/volume-links"
+version = "0.1.0"
+title = "Links from the program to the volume"
+category = "data"
+summary = "Symlinks from where the program expects its data to a volume, so the program's own paths work as is."
+multi = true
+requires = ["core/volume"]
+source = "~/ncm.flk/Dockerfile (artifacts/, data/)"
+
+[params.links]
+type = "map"
+required = true
+prompt = "LINK = TARGET pairs: { \"/opt/ncm/data\" = \"/data/data\" }"
+
+[[dockerfile]]
+slot = "install"
+text = '''
+# The program's data paths point at the volume, so its own commands work as is.
+RUN {{$first := true}}{{range $link, $target := .P.links}}{{if not $first}} \
+ && {{end}}ln -s {{$target}} {{$link}}{{$first = false}}{{end}}'''
+
+[[next]]
+kind = "pending"
+text = "The link targets ({{range $l, $t := .P.links}}{{$t}} {{end}}) must exist on the volume"
+why = "create them at first boot (a start script's mkdir -p) or once with flk exec mkdir -p"
+
+[hints]
+what = "Creates symlinks in the image that point into a volume."
+under_the_hood = """
+The link lives in the image; its target is on the volume, mounted at boot.
+Until the target exists, the link dangles, so create the directories at
+first boot. Big data (checkpoints, datasets) stays out of the image and
+survives deploys.
+"""
+gotchas = ["A link's own path must not exist in the image already (ln -s fails, or links inside the directory)."]
+docs = ["flk help volumes"]

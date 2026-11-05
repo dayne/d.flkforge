@@ -1,0 +1,31 @@
+title = "Python workbench"
+summary = "A pinned git checkout with its Python requirements, big data on a volume, and a VM that stays up for flk ssh console (like ncm)."
+
+[[use]]
+  snippet = "core/base-python"
+
+[[use]]
+  snippet = "core/packages"
+  params = { list = ["git", "ca-certificates", "procps", "less"] }
+
+[[use]]
+  snippet = "core/git-pinned"
+
+[[use]]
+  snippet = "core/pip"
+  params = { requirements = "requirements.txt" }
+
+[[use]]
+  snippet = "core/env"
+  params = { vars = { PYTHONUNBUFFERED = "1" } }
+
+[[use]]
+  snippet = "core/volume"
+  params = { holds = "checkpoints, datasets, caches" }
+
+[[use]]
+  snippet = "core/idle-cmd"
+
+[[use]]
+  snippet = "core/vm"
+  params = { cpus = 4, memory = "8gb" }

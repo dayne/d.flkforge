@@ -3,6 +3,7 @@ version = "0.1.0"
 title = "Restart: one more try"
 category = "restart"
 summary = "flk restarts the VM once after a failure, then leaves it for a human: for apps whose wrapper restarts the server itself."
+conflicts = ["core/restart-always", "core/restart"]
 source = "the four game flk.tomls"
 
 [[flktoml]]

@@ -1,0 +1,60 @@
+# flkt-template: made by flkforge from flkforge.toml. Change the recipe and run
+# `flkforge render`, or edit this file and stop using flkforge for it.
+app = "flkt-template"
+
+# flk-run stops the server cleanly within stop_timeout (100s); give it
+# that, plus a margin, before flk kills the VM.
+kill_timeout = 120
+
+[build]
+  dockerfile = "Dockerfile"
+
+[build.args]
+  # VS: the pinned version and its sha256. Change both to upgrade.
+  VS_VERSION = "1.22.7"
+  VS_SHA256 = "a7d4a520604590a96de812ee6c6baf4404d43d86cf1ec4fbac1b3a580b52c847"
+
+[env]
+  # flk-run, the run engine (see flk-run for details)
+  RUN_STOP = "signal:TERM"
+  STOP_TIMEOUT = "100"    # then SIGKILL (< kill_timeout)
+  RESTART_DELAY = "10"    # seconds before restarting after a crash
+  MAX_RESTARTS = "5"      # give up after this many restarts...
+  RESTART_WINDOW = "600"  # ...within this many seconds
+
+# The run wrapper restarts the server itself and gives up on a crash loop
+# (exits 1). flk's restart policy is only the outer net: restart the VM
+# once, then leave it stopped for a human.
+[[restart]]
+  policy = "on-failure"
+  retries = 1
+
+[flk]
+  keep_releases = 3  # images kept for flk releases rollback (default 2)
+
+# Backups stop the machine (a clean stop, through the run wrapper), copy,
+# and start it again: the copy is exactly what the app saved.
+[flk.backup]
+  mode = "stop"
+  before_deploy = true
+
+# A deploy waits for this line on the console; a machine that doesn't log
+# it within grace_period goes back to its previous release.
+[checks.ready]
+  type = "log"
+  match = "Dedicated Server now running"
+  grace_period = "5m"
+
+[[vm]]
+  cpus = 2
+  memory = "4gb"
+
+[[mounts]]
+  source = "data"
+  destination = "/data"
+
+[[services]]
+  internal_port = 42420
+  protocol = "tcp"
+  [[services.ports]]
+    port = 42420

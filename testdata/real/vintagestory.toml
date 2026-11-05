@@ -1,0 +1,74 @@
+# A reference recipe for vintagestory-flk, PLAN M3. Not a migration: the real app
+# stays hand-written. TestReferenceApps compares what flk reads from the
+# rendered flk.toml with the real one; vintagestory.notes.md has the differences.
+flkforge = "0.1.0"
+app = "vintagestory-flk"
+
+[[use]]
+  snippet = "core/base-dotnet"
+  params = { version = "10.0" }
+
+[[use]]
+  snippet = "core/packages"
+  params = { list = ["curl"] }
+
+[[use]]
+  snippet = "core/download-sha256"
+  params = { name = "VS", version = "1.22.7", sha256 = "a7d4a520604590a96de812ee6c6baf4404d43d86cf1ec4fbac1b3a580b52c847", file = "dist/vs_server_linux-x64_${VS_VERSION}.tar.gz", dest = "/server", args_in_flk_toml = false }
+
+[[use]]
+  snippet = "core/checksum-manifest"
+  params = { from = "dist/mods-${MODS}/", manifest = "mods/${MODS}.sha256", dest = "/opt/vs-mods", arg = "MODS=1.22.7-2" }
+
+[[use]]
+  snippet = "core/run-wrapper"
+  params = { command = ["dotnet", "VintagestoryServer.dll", "--dataPath", "/data"], stop = "console:/stop", stop_timeout = 100, kill_margin = 20, ready = "Dedicated Server now running on Port", hooks = ["prestart", "watch"] }
+
+[[use]]
+  snippet = "core/user-1000"
+  params = { workdir = "/server" }
+
+[[use]]
+  snippet = "core/timezone"
+  params = { zone = "America/Anchorage" }
+
+[[use]]
+  snippet = "core/env"
+  params = { comment = "vs-run's own settings", vars = { VS_DATA = "/data", STORM_POLL = "120" } }
+
+[[use]]
+  snippet = "core/volume"
+  params = { name = "vsdata", path = "/data", holds = "Saves, Mods, ModConfig, Logs, serverconfig.json" }
+
+[[use]]
+  snippet = "core/check-log"
+  params = { match = "Dedicated Server now running on Port", grace = "5m" }
+
+[[use]]
+  snippet = "core/check-tcp"
+  params = { name = "port", port = 42420, grace = "5m" }
+
+[[use]]
+  snippet = "core/backup-verify"
+  params = { file = "bin/vs-verify-backup" }
+
+[[use]]
+  snippet = "core/before-deploy"
+  params = { keep_releases = 3 }
+
+[[use]]
+  snippet = "core/restart-outer-net"
+
+[[use]]
+  snippet = "core/vm"
+  params = { cpus = 4, memory = "6gb" }
+
+[[use]]
+  snippet = "core/service"
+  id = "game-tcp"
+  params = { port = 42420, protocol = "tcp" }
+
+[[use]]
+  snippet = "core/service"
+  id = "game-udp"
+  params = { port = 42420, protocol = "udp" }

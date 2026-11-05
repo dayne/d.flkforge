@@ -35,6 +35,12 @@ default = "/server"
 prompt = "Where the server goes in the image"
 validate = '^/[A-Za-z0-9._/-]+$'
 
+[params.single_stage]
+type = "bool"
+default = false
+prompt = "Download in the final image instead of a stage of its own (needs a steamcmd base: core/base-wine)"
+hint = "For servers too big to copy between stages (Enshrouded: 7.6 GB). The download runs as uid 1000, so no chown layer copies it again."
+
 [params.check_file]
 type = "string"
 prompt = "A file the download must contain (relative to dir), to catch a broken download"
@@ -50,6 +56,7 @@ text = """
 
 [[dockerfile]]
 stage = "steam"
+when = "{{not .P.single_stage}}"
 text = '''
 # --- download the server with steamcmd -----------------------------------------
 FROM docker.io/steamcmd/steamcmd:ubuntu-24 AS steam
@@ -71,7 +78,31 @@ RUN for try in 1 2 3; do \
 
 [[dockerfile]]
 slot = "fetch"
+when = "{{not .P.single_stage}}"
 text = "COPY --from=steam {{.P.dir}} {{.P.dir}}"
+
+[[dockerfile]]
+slot = "fetch"
+when = "{{.P.single_stage}}"
+text = '''
+{{- if not (hasPrefix .App.Image "docker.io/steamcmd/")}}{{fail "core/steamcmd: single_stage needs a steamcmd base image (core/base-wine)"}}{{end -}}
+# The server, downloaded in this image (no copy between stages) as {{default "root" .App.BaseUser}}.
+ARG STEAM_BUILDID=latest
+RUN install -d{{if .App.BaseUser}} -o {{.App.BaseUser}} -g {{.App.BaseUser}}{{end}} {{.P.dir}} \
+ && for try in 1 2 3; do \
+      {{if .App.BaseUser}}su {{.App.BaseUser}} -s /bin/sh -c "{{end}}steamcmd {{if eq .P.platform "windows"}}+@sSteamCmdForcePlatformType windows {{end}}+force_install_dir {{.P.dir}} +login anonymous +app_update {{.P.app_id}} validate +quit{{if .App.BaseUser}}"{{end}} && break; \
+      echo "steamcmd failed (try $try)"; sleep 5; \
+    done \
+{{- if .P.check_file}}
+ && test -e {{.P.dir}}/{{.P.check_file}} \
+{{- end}}
+ && got=$(sed -n 's/^[[:space:]]*"buildid"[[:space:]]*"\([0-9]*\)".*/\1/p' {{.P.dir}}/steamapps/appmanifest_{{.P.app_id}}.acf | head -1) \
+ && echo "$got" > {{.P.dir}}/BUILDID \
+ && echo "Steam build $got (pinned: $STEAM_BUILDID)" \
+ && if [ "$STEAM_BUILDID" != latest ] && [ "$STEAM_BUILDID" != "$got" ]; then \
+      echo "ERROR: Steam served build $got but flk.toml pins $STEAM_BUILDID: set the new build id" >&2; exit 1; \
+    fi \
+ && rm -rf {{.P.dir}}/steamapps/downloading {{.P.dir}}/steamapps/temp'''
 
 [[flktoml]]
 text = '''

@@ -1,0 +1,26 @@
+id = "core/base-python"
+version = "0.1.0"
+title = "Python base"
+category = "base"
+summary = "Python on Debian slim: for notebooks, tools and Python services."
+source = "~/ncm.flk/Dockerfile"
+
+[params.version]
+type = "string"
+default = "3.12"
+prompt = "Python version"
+validate = '^[0-9]+\.[0-9]+$'
+
+[base]
+image = "docker.io/library/python:{{.P.version}}-slim"
+family = "apt"
+
+[hints]
+what = "Starts the image from Python's official slim image (Debian-based)."
+under_the_hood = """
+python and pip are on the PATH. There's no uid-1000 user (core/user-1000
+makes one). Set PYTHONUNBUFFERED=1 in [env] so print() reaches flk logs at
+once instead of in buffered blocks.
+"""
+gotchas = ["pip's default torch wheel pulls gigabytes of CUDA libraries a VM can't use: core/pip has a CPU-only option."]
+docs = ["flk help --all  (Machines)"]

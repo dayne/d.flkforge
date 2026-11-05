@@ -51,6 +51,18 @@ real apps and the boot service run main):
   stripped (site-specific values, secret names?).
 - Whether lazyflk browses the hub too.
 
+## From M3
+
+- `core/sshd` (deferred): sshd is a second, root-owned process next to the
+  app, with host keys made at first boot on a volume and a public key from
+  the build context or a secret. It needs a design for running two
+  processes (flk-run's prestart? a tiny supervisor?) and real SSH clients
+  to test with. `flk ssh console` covers shells meanwhile
+  (`flkforge explain shell`).
+- The reference recipes show what the real apps' wrappers do that flk-run
+  hooks would have to: worth offering to a game repo's owner as a port
+  (Dayne's call), not doing here.
+
 ## From M2's agent test
 
 - The report could show the port mapping (host 6390 -> VM 6390/tcp).

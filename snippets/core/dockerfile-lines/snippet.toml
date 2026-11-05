@@ -1,0 +1,37 @@
+id = "core/dockerfile-lines"
+version = "0.1.0"
+title = "Dockerfile lines of your own"
+category = "misc"
+summary = "Your own Dockerfile lines in one of the slots, for a step no snippet covers."
+multi = true
+requires = ["category:base"]
+source = "(an escape hatch)"
+
+[params.slot]
+type = "enum"
+values = ["packages", "env", "fetch", "install", "copy", "dirs", "user", "entry"]
+default = "install"
+prompt = "Where they go: packages, env, fetch, install, copy, dirs, user (after the USER line) or entry"
+
+[params.text]
+type = "string"
+required = true
+prompt = "The lines, as in a Dockerfile (comments welcome)"
+
+[[dockerfile]]
+slot = "{{.P.slot}}"
+text = "{{.P.text}}"
+
+[hints]
+what = "Puts your own lines into the Dockerfile at a slot."
+under_the_hood = """
+The final stage is assembled from slots in a fixed order: from, packages,
+env, fetch, install, copy, dirs, user, entry. Lines in a slot come in
+recipe order. In the user slot they run as the app's user (after USER).
+flkforge's rules still read the result (guest-init, for instance).
+"""
+gotchas = [
+  "Prefer a snippet when one exists: it carries the hints, rules and next steps.",
+  "curl | bash installers into the user's home are frozen on a home volume and hidden by it; install system-wide instead.",
+]
+docs = ["flk help --all  (Machines)"]

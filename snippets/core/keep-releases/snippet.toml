@@ -1,0 +1,31 @@
+id = "core/keep-releases"
+version = "0.1.0"
+title = "Releases kept for rollback"
+category = "misc"
+summary = "How many release images flk keeps for flk releases rollback (default 2)."
+source = "the game flk.tomls"
+
+[params.count]
+type = "int"
+required = true
+min = 1
+prompt = "Release images to keep"
+
+[merge]
+"flk.keep_releases" = "max"
+
+[[flktoml]]
+text = '''
+[flk]
+  keep_releases = {{.P.count}}  # images kept for flk releases rollback (default 2)
+'''
+
+[hints]
+what = "Sets [flk] keep_releases."
+under_the_hood = """
+Each deploy makes a release image; flk keeps the newest keep_releases and
+deletes the rest. Rollback can only go to a kept one. Images are the size
+of the root filesystem, so this costs disk.
+"""
+gotchas = ["For programs whose old versions vanish upstream (Steam builds), these images are the only way back."]
+docs = ["flk help releases", "flk images"]

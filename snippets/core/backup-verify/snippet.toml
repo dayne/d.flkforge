@@ -1,0 +1,45 @@
+id = "core/backup-verify"
+version = "0.1.0"
+title = "Check each backup"
+category = "backup"
+summary = "A host script flk runs on every backup to check it holds what matters (with debugfs: no mount, no root)."
+source = "~/minecraft.flk, ~/vintagestory.flk, ~/valheim.flk (bin/*-verify-backup)"
+
+[params.file]
+type = "string"
+default = "bin/verify-backup"
+prompt = "The script's path in the app directory"
+validate = '^[A-Za-z0-9._/-]+$'
+
+[params.paths]
+type = "list"
+default = []
+prompt = "Paths that must exist in the volume (/world/level.dat)"
+validate = '^/'
+
+[[file]]
+path = "{{.P.file}}"
+template = "verify-backup"
+own = "seed"
+mode = "755"
+
+[[flktoml]]
+text = '''
+[flk.backup]
+  verify = {{toml .P.file}}  # run on every backup: exit 0 = good
+'''
+
+[hints]
+what = "Writes a verify script and sets [flk.backup] verify to it."
+under_the_hood = """
+After each backup's e2fsck, flk runs verify on the host, in the flk.toml's
+directory, with FLK_BACKUP set to the image file. A failure fails the
+backup (and a before_deploy backup's deploy). debugfs reads the ext4
+image directly. The stub checks paths exist; a real one checks the
+newest save is complete (valheim.flk's checks Valheim's .ok markers).
+"""
+gotchas = [
+  "Pass on a volume the app never used (nothing to protect), or a first deploy that fixes a broken start can't take its before_deploy backup.",
+  "Needs debugfs on the host (e2fsprogs).",
+]
+docs = ["flk help --all  (Config: [flk.backup] verify)", "flk help volumes verify", "~/valheim.flk/bin/vh-verify-backup"]

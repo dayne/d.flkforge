@@ -1,0 +1,26 @@
+id = "core/base-debian"
+version = "0.1.0"
+title = "Debian base"
+category = "base"
+summary = "Debian slim: apt and glibc, smaller than Ubuntu, with no uid-1000 user (core/user-1000 makes one)."
+source = "(new)"
+
+[params.version]
+type = "string"
+default = "12-slim"
+prompt = "Debian version (the image tag)"
+validate = '^[0-9a-z.-]+$'
+
+[base]
+image = "docker.io/library/debian:{{.P.version}}"
+family = "apt"
+
+[hints]
+what = "Starts the image from Debian (the slim variant by default: about 75 MB)."
+under_the_hood = """
+flk deploy turns the image into the VM's root filesystem. Debian has
+util-linux (setpriv), so flk's init can run the app as another user;
+there's no uid-1000 user until core/user-1000 creates one.
+"""
+gotchas = ["slim images leave out man pages and some locales; add packages as needed (core/packages)."]
+docs = ["flk help --all  (Machines)"]

@@ -140,6 +140,10 @@ type Next struct {
 	// the file on disk differs from what the snippet first wrote (a stub
 	// that has been filled in).
 	UntilEdited string `toml:"until_edited"`
+	// UnlessFound: drop the step when this text is in the Dockerfile's
+	// CMD/ENTRYPOINT or in a file another snippet writes (someone already
+	// does what the step asks: idle-cmd's before = "flk-seed-home").
+	UnlessFound string `toml:"unless_found"`
 }
 
 var (
@@ -213,7 +217,7 @@ func (s *Snippet) validate() error {
 		}
 	}
 	for _, d := range s.Dockerfile {
-		if !slices.Contains(Slots, d.Slot) && d.Stage == "" {
+		if !slices.Contains(Slots, d.Slot) && d.Stage == "" && !strings.Contains(d.Slot, "{{") {
 			return fmt.Errorf("%s: Dockerfile slot %q isn't one of %s", s.ID, d.Slot, strings.Join(Slots, ", "))
 		}
 	}

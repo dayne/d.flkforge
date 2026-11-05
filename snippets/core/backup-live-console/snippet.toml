@@ -1,0 +1,62 @@
+id = "core/backup-live-console"
+version = "0.1.0"
+title = "Backups: live, with console save hooks"
+category = "backup"
+summary = "Copy the volume while the server runs, after console commands make it save and stop writing (Minecraft's save-off / save-all)."
+conflicts = ["core/backup-pause", "core/backup-stop", "core/stdin-null"]
+source = "~/minecraft.flk/flk.toml"
+
+[params.pre]
+type = "list"
+required = true
+prompt = "Console lines typed before the copy, in order (save-off, save-all flush)"
+
+[params.wait]
+type = "regex"
+required = true
+prompt = "A regex for the line that says the last one finished (Saved the game)"
+
+[params.timeout]
+type = "int"
+default = 300
+min = 1
+prompt = "Seconds to wait for it"
+
+[params.post]
+type = "list"
+default = []
+prompt = "Console lines typed after the copy, even if it failed (save-on)"
+
+[params.verify]
+type = "string"
+prompt = "A host command that checks a backup (optional; gets FLK_BACKUP)"
+
+[[flktoml]]
+text = '''
+# Backups copy the volume while the server runs: the pre hooks make it save
+# and stop writing first, the post hooks turn writing back on (they run
+# even if the backup failed). No downtime, and nothing unsaved is lost.
+[flk.backup]
+  mode = "live"
+  pre = [{{range $i, $l := .P.pre}}{{if $i}}, {{end}}{ console = {{toml $l}}{{if eq (add $i 1) (add (len $.P.pre) 0)}}, wait = {{toml $.P.wait}}, timeout = {{$.P.timeout}}{{end}} }{{end}}]
+{{- if .P.post}}
+  post = [{{range $i, $l := .P.post}}{{if $i}}, {{end}}{ console = {{toml $l}} }{{end}}]{{end}}
+{{- if .P.verify}}
+  verify = {{toml .P.verify}}{{end}}
+'''
+
+[hints]
+what = "Sets [flk.backup] mode = \"live\" with console pre and post hooks."
+under_the_hood = """
+flk volumes backup types each pre line into the app's console (its stdin,
+the serial console), waits for the wait regex after the last one, then
+copies the running volume and runs e2fsck on the copy. The post lines run
+afterwards whatever happened. The console must reach the app: stdin
+"console" (the default), and a run wrapper that forwards it (flk-run
+does).
+"""
+gotchas = [
+  "If the wait line never comes, the backup fails after timeout and the post hooks still run.",
+  "Not with stdin = \"null\": the hooks would go nowhere (rule live-backup-console).",
+]
+docs = ["flk help --all  (Config: [flk.backup])", "flk help volumes backup"]

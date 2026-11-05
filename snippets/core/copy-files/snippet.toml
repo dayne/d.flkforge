@@ -1,0 +1,56 @@
+id = "core/copy-files"
+version = "0.1.0"
+title = "Copy your files into the image"
+category = "fetch"
+summary = "COPY files you keep in the app directory (config files, scripts) into the image."
+multi = true
+requires = ["category:base"]
+source = "~/mqtt.flk/Dockerfile (mosquitto.conf, acl)"
+
+[params.files]
+type = "list"
+required = true
+prompt = "Files or directories, relative to the app directory"
+validate = '^[A-Za-z0-9._/-]+$'
+
+[params.dest]
+type = "string"
+required = true
+prompt = "Where they go in the image (a directory ends in /)"
+validate = '^/[A-Za-z0-9._/-]*$'
+
+[params.mode]
+type = "string"
+prompt = "chmod them in the image (optional, e.g. 644, or 600 for secrets-ish config)"
+validate = '^[0-7]{3,4}$'
+
+[params.owner]
+type = "string"
+prompt = "chown them in the image (optional, user[:group])"
+validate = '^[a-z_][a-z0-9_-]*(:[a-z_][a-z0-9_-]*)?$'
+
+[[dockerfile]]
+slot = "copy"
+text = '''
+COPY {{join .P.files " "}} {{.P.dest}}
+{{- if or .P.mode .P.owner}}
+RUN cd {{.P.dest}}{{if .P.owner}} && chown {{.P.owner}} {{join (bases .P.files) " "}}{{end}}{{if .P.mode}} && chmod {{.P.mode}} {{join (bases .P.files) " "}}{{end}}{{end}}'''
+
+[[next]]
+kind = "pending"
+text = "{{join .P.files \", \"}}: yours to provide in the app directory"
+why = "flkforge copies them into the image but doesn't write them; flkforge check says if one is missing"
+
+[hints]
+what = "Adds a COPY of your own files to the Dockerfile."
+under_the_hood = """
+flk deploy builds from the app directory (the build context), so any file
+in it can be copied into the image. The files are part of the release:
+a change takes effect at the next deploy, and flk releases rollback brings
+the old ones back.
+"""
+gotchas = [
+  "Never a private key or a password: anything in the build context can end up in an image layer. Secrets go in flk secrets.",
+  "Config the app rewrites at runtime belongs on a volume instead (the image's copy resets at every deploy).",
+]
+docs = ["flk help --all  (Config: [build])"]

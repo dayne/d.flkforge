@@ -1,0 +1,53 @@
+id = "core/pip"
+version = "0.1.0"
+title = "Python packages (pip)"
+category = "fetch"
+summary = "pip install packages or a requirements file, with an option for CPU-only torch."
+multi = true
+requires = ["category:base"]
+source = "~/ncm.flk/Dockerfile"
+
+[params.packages]
+type = "list"
+default = []
+prompt = "Packages (pin them: requests==2.32.3)"
+
+[params.requirements]
+type = "string"
+prompt = "A requirements file, relative to workdir (requirements.txt)"
+validate = '^[A-Za-z0-9._/-]+$'
+
+[params.workdir]
+type = "string"
+prompt = "Run pip there (and leave the image's WORKDIR there)"
+validate = '^/[A-Za-z0-9._/-]+$'
+
+[params.torch_cpu]
+type = "bool"
+default = false
+prompt = "Install torch's CPU-only wheel first"
+hint = "The default torch wheel pulls about 3 GB of CUDA libraries; flk VMs have no GPU."
+
+[[dockerfile]]
+slot = "install"
+text = '''
+{{- if .P.workdir}}
+WORKDIR {{.P.workdir}}
+{{end}}
+{{- if .P.torch_cpu}}
+# CPU wheel of torch first (the default wheel pulls ~3GB of CUDA libs), then the rest.
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu{{if or .P.packages .P.requirements}} \
+ && {{end}}{{else if or .P.packages .P.requirements}}RUN {{end}}
+{{- if .P.packages}}pip install --no-cache-dir {{join .P.packages " "}}{{if .P.requirements}} \
+ && {{end}}{{end}}
+{{- if .P.requirements}}pip install --no-cache-dir -r {{.P.requirements}}{{end}}'''
+
+[hints]
+what = "Installs Python packages with pip at build time."
+under_the_hood = """
+pip runs in the image build, with --no-cache-dir so pip's cache doesn't
+stay in the layer. The packages are part of the release; rebuilding with
+unpinned packages can bring newer versions.
+"""
+gotchas = ["Pin versions (or use a lock file) for reproducible releases.", "torch_cpu: flk VMs have no GPU (flkforge explain gpu)."]
+docs = ["flkforge explain gpu"]

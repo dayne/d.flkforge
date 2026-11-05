@@ -1,0 +1,23 @@
+# flkt-template: made by flkforge from flkforge.toml. Change the recipe and run
+# `flkforge render`, or edit this file and stop using flkforge for it.
+app = "flkt-template"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[flk]
+  rootfs_extra_mb = 4096  # free space on / (default 512)
+
+[[vm]]
+  cpus = 2
+  memory = "2gb"
+
+[[mounts]]
+  source = "workspace"
+  destination = "/workspace"
+
+# The user's home: dotfiles, tool logins, shell history. Seeded from the
+# image at first boot (flk-seed-home), then kept across deploys.
+[[mounts]]
+  source = "home"
+  destination = "/home/dev"

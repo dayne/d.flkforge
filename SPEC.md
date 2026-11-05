@@ -61,6 +61,10 @@ features without a terminal, through a recipe file and `--json`.
   id. The hub becomes another source (section 10).
 - **Rule**: a check across snippets that turns into a hint, a warning or
   an error (section 6.4).
+- **Escape hatches**: `core/flk-toml` (commented TOML of your own, merged
+  like a fragment) and `core/dockerfile-lines` (lines of your own in a
+  slot), for what no snippet covers. Rules and `flk config show` still
+  check the result. Prefer a snippet: it carries the hints and next steps.
 
 ## 4. Snippet format
 
@@ -156,6 +160,7 @@ order = 50                    # run steps sort by it: launch is 0, volumes 20, d
 text = "Pin the current build: look it up on api.steamcmd.net and set build_id"
 why = "..."                   # shown after the step
 until_edited = ""             # a seed file: the step goes away once it differs from the stub
+unless_found = ""             # the step goes away when this text is in the CMD/ENTRYPOINT or another snippet's file
 when = '{{eq .P.build_id "latest"}}'
 ```
 
@@ -622,3 +627,7 @@ recipe's `[[vm]]` gives; fly.io deployment.
   the rules catalog and eight more rules (6.4); check's ports, deployed
   state and secrets (7); the limits catalog (8.1); add/rm/set,
   snippets show, templates, explain (9).
+- 2026-11-04 (M3): the catalog (52 snippets, 9 templates), `unless_found`
+  on next steps, the escape hatches (3), templated Dockerfile slots,
+  `kill_margin` on run-wrapper, rule `jvm-heap`. `sshd` is deferred
+  (TODO.md).

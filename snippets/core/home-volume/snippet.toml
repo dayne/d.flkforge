@@ -1,0 +1,71 @@
+id = "core/home-volume"
+version = "0.1.0"
+title = "Home directory on a volume"
+category = "data"
+summary = "The user's home on a volume, seeded from the image at first boot: tool logins and dotfiles survive deploys."
+requires = ["category:user"]
+source = "(new; from the genma notes)"
+
+[params.name]
+type = "string"
+default = "home"
+prompt = "Volume name"
+validate = '^[a-z0-9_]+$'
+
+[params.size]
+type = "int"
+default = 5
+min = 1
+prompt = "Size in GB"
+
+[[file]]
+path = "flk-seed-home"
+template = "flk-seed-home"
+verbatim = true
+mode = "755"
+
+[[dockerfile]]
+slot = "dirs"
+text = '''
+# The home directory as the image built it, copied onto the home volume at
+# first boot by flk-seed-home (the volume hides the image's copy).
+COPY flk-seed-home /usr/local/bin/flk-seed-home
+RUN cp -a /home/{{.App.User}} /opt/flk-home-seed'''
+
+[[flktoml]]
+text = '''
+# The user's home: dotfiles, tool logins, shell history. Seeded from the
+# image at first boot (flk-seed-home), then kept across deploys.
+[[mounts]]
+  source = {{toml .P.name}}
+  destination = "/home/{{.App.User}}"
+'''
+
+[[next]]
+order = 20
+text = "flk volumes create {{.P.name}} --size {{.P.size}}"
+why = "the home volume; its root takes the owner of /home/{{.App.User}} in the image on first use"
+
+[[next]]
+kind = "pending"
+unless_found = "flk-seed-home"
+text = "Run flk-seed-home before anything uses the home directory"
+why = "core/idle-cmd's before = \"flk-seed-home\", or the first line of your start script or prestart hook"
+
+[hints]
+what = "Mounts a volume over the app user's home and seeds it from the image on first boot."
+under_the_hood = """
+The root filesystem is rebuilt at every deploy, so a home directory in the
+image loses logins (~/.claude, ~/.config), history and dotfiles each time.
+A volume keeps them, but mounting it over /home/USER hides what the image
+put there. So the image keeps a copy in /opt/flk-home-seed, and
+flk-seed-home copies it in once, marking the volume. Tools installed
+system-wide (packages, /usr/local) stay in the image and update with each
+deploy; tools installed into ~ (curl | bash installers) would be frozen on
+the volume, so install system-wide.
+"""
+gotchas = [
+  "Things added to the image's home after the first boot don't reach the volume (it's seeded once).",
+  "flk's planned [[mounts]] seed = true (flk M6) will do this in flk itself.",
+]
+docs = ["flk help volumes", "flkforge explain mount-hides"]

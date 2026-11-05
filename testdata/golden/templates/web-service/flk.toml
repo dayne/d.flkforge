@@ -1,0 +1,25 @@
+# flkt-template: made by flkforge from flkforge.toml. Change the recipe and run
+# `flkforge render`, or edit this file and stop using flkforge for it.
+app = "flkt-template"
+
+[build]
+  dockerfile = "Dockerfile"
+
+# A deploy waits for this port to accept connections; a machine that
+# doesn't within grace_period goes back to its previous release.
+[checks.tcp]
+  type = "tcp"
+  port = 8080
+  grace_period = "30s"
+
+[[vm]]
+  cpus = 1
+  memory = "256mb"
+
+[[mounts]]
+  source = "data"
+  destination = "/data"
+
+# The port flk waits for after boot and prints as the app's URL.
+[http_service]
+  internal_port = 8080

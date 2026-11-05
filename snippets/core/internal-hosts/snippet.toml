@@ -1,0 +1,23 @@
+id = "core/internal-hosts"
+version = "0.1.0"
+title = "Find other apps by name"
+category = "network"
+summary = "APP.internal names in /etc/hosts, so this app can reach other flk apps on the host."
+source = "~/flk/examples/reference/flk.toml"
+
+[[flktoml]]
+text = '''
+[flk]
+  internal_hosts = true  # APP.internal and ID.vm.APP.internal in /etc/hosts
+'''
+
+[hints]
+what = "Sets [flk] internal_hosts = true."
+under_the_hood = """
+flk's init writes /etc/hosts at boot. With internal_hosts, it adds every
+app's machines as APP.internal (and ID.vm.APP.internal), on flk's private
+network, so one app can talk to another (a game to the MQTT broker)
+without going through the host's forwarded ports.
+"""
+gotchas = ["The names are written at boot: an app deployed later appears after this one restarts."]
+docs = ["flk help --all  (Config: [flk] internal_hosts)"]

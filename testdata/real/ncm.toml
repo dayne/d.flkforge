@@ -1,0 +1,56 @@
+# A reference recipe for ncm, PLAN M3. Not a migration: the real app
+# stays hand-written. TestReferenceApps compares what flk reads from the
+# rendered flk.toml with the real one; ncm.notes.md has the differences.
+flkforge = "0.1.0"
+app = "ncm"
+
+[[use]]
+  snippet = "core/base-python"
+  params = { version = "3.12" }
+
+[[use]]
+  snippet = "core/packages"
+  params = { list = ["git", "ca-certificates", "less", "vim-tiny", "procps", "htop"] }
+
+[[use]]
+  snippet = "core/git-pinned"
+  params = { url = "https://github.com/HazyResearch/ncm.git", ref = "c70274273f489abc73832b2b98584a8483b6b203", arg = "NCM_REF", dest = "/opt/ncm", patch = "cpu.patch" }
+
+[[use]]
+  snippet = "core/pip"
+  params = { torch_cpu = true, requirements = "requirements.txt", workdir = "/opt/ncm" }
+
+[[use]]
+  snippet = "core/image-env"
+  params = { vars = { HF_HOME = "/data/hf-cache" } }
+
+[[use]]
+  snippet = "core/volume-links"
+  params = { links = { "/opt/ncm/artifacts" = "/data/artifacts", "/opt/ncm/data" = "/data/data" } }
+
+[[use]]
+  snippet = "core/start-script"
+  [use.params]
+    body = '''
+#!/bin/sh
+# Prepare the volume layout, then idle so the machine stays up for flk ssh console.
+mkdir -p /data/artifacts /data/data /data/hf-cache
+echo "ncm ready: flk ssh console, then cd /opt/ncm"
+exec sleep infinity
+'''
+
+[[use]]
+  snippet = "core/env"
+  params = { vars = { PYTHONUNBUFFERED = "1" } }
+
+[[use]]
+  snippet = "core/vm"
+  params = { cpus = 4, memory = "8gb" }
+
+[[use]]
+  snippet = "core/volume"
+  params = { name = "ncm", path = "/data", holds = "checkpoints (~8GB), datasets (~23GB), the Hugging Face cache" }
+
+[[use]]
+  snippet = "core/check-log"
+  params = { match = "ncm ready", grace = "60s" }

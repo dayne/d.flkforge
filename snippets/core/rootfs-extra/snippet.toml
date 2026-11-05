@@ -1,0 +1,28 @@
+id = "core/rootfs-extra"
+version = "0.1.0"
+title = "Free space on the root filesystem"
+category = "vm"
+summary = "Extra free space on / beyond what the image uses (flk's default is 512 MB)."
+source = "~/opencode.flk/flk.toml"
+
+[params.mb]
+type = "int"
+required = true
+min = 0
+prompt = "MB of free space on /"
+
+[[flktoml]]
+text = '''
+[flk]
+  rootfs_extra_mb = {{.P.mb}}  # free space on / (default 512)
+'''
+
+[hints]
+what = "Sets [flk] rootfs_extra_mb."
+under_the_hood = """
+flk turns the image into an ext4 root filesystem sized to its contents
+plus rootfs_extra_mb. Everything written there is lost at the next deploy
+(the rootfs is rebuilt), so it's scratch space: build caches, temp files.
+"""
+gotchas = ["What must survive a deploy goes on a volume, not here."]
+docs = ["flk help --all  (Config: [flk])"]

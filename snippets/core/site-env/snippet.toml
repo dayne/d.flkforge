@@ -1,0 +1,34 @@
+id = "core/site-env"
+version = "0.1.0"
+title = "Host settings file (site.env)"
+category = "misc"
+summary = "A site.env.example for host-specific settings that stay out of git, and a .gitignore line for site.env."
+source = "~/valheim.flk/site.env.example"
+
+[params.keys]
+type = "list"
+default = []
+prompt = "Settings to list in site.env.example (names)"
+validate = '^[A-Z][A-Z0-9_]*$'
+
+[[file]]
+path = "site.env.example"
+template = "site.env.example"
+own = "seed"
+
+[[next]]
+kind = "pending"
+text = "cp site.env.example site.env && chmod 600 site.env, fill it in, and add site.env to .gitignore"
+why = "site.env is this host's; the example is what goes in git"
+
+[hints]
+what = "Writes site.env.example, a template for this host's own settings."
+under_the_hood = """
+flk.toml is meant for git and is the same on every host. Some settings
+aren't: which LAN address to bind, where big volumes live, the values
+your scripts turn into flk secrets. valheim.flk keeps those in a
+gitignored site.env that its bin/vh reads; this snippet starts that
+pattern. flk itself never reads site.env.
+"""
+gotchas = ["Scripts that read it are yours to write (bin/APP preflight, bootstrap)."]
+docs = ["~/valheim.flk/README.md", "~/m.gamebus/PREFLIGHT.md"]

@@ -1,0 +1,26 @@
+id = "core/flk-toml"
+version = "0.1.0"
+title = "flk.toml lines of your own"
+category = "misc"
+summary = "Merge your own commented TOML into flk.toml, for a key no snippet covers."
+multi = true
+source = "(an escape hatch)"
+
+[params.text]
+type = "string"
+required = true
+prompt = "TOML, as you'd write it in flk.toml (comments kept)"
+hint = "It's merged like a snippet's: tables merge, [[arrays]] append, and a key another snippet sets to a different value is an error. flk config show checks the keys."
+
+[[flktoml]]
+text = "{{.P.text}}"
+
+[hints]
+what = "Merges the TOML you give into flk.toml."
+under_the_hood = """
+flkforge parses it with the same comment-keeping parser as snippets'
+fragments and merges it in. flk config show (run by every render) warns
+about any key flk doesn't know, and the render refuses to write it.
+"""
+gotchas = ["Prefer a snippet when one exists: it carries the hints, rules and next steps that go with the key."]
+docs = ["flk help --all  (Config)", "~/flk/examples/reference/flk.toml (every key flk reads)"]

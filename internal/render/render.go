@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"path"
 	"slices"
 	"sort"
 	"strconv"
@@ -216,7 +217,7 @@ func Render(r *recipe.Recipe, cat Resolver) (*Result, error) {
 		}
 	}
 
-	if res.Steps, err = steps(uses, app); err != nil {
+	if res.Steps, err = steps(uses, app, res); err != nil {
 		return nil, err
 	}
 	res.Findings = rules(uses, base, app, res)
@@ -318,7 +319,14 @@ func renderDockerfile(uses []*use, base *use, app App) (string, []string, error)
 			if !ok {
 				continue
 			}
-			text, err := execute(u.s.ID+" Dockerfile "+f.Slot, f.Text, d)
+			slot, err := execute(u.s.ID+" Dockerfile slot", f.Slot, d)
+			if err != nil {
+				return "", nil, err
+			}
+			if slot = strings.TrimSpace(slot); f.Stage == "" && !slices.Contains(snippet.Slots, slot) {
+				return "", nil, fmt.Errorf("%s: Dockerfile slot %q isn't one of %s", u.key, slot, strings.Join(snippet.Slots, ", "))
+			}
+			text, err := execute(u.s.ID+" Dockerfile "+slot, f.Text, d)
 			if err != nil {
 				return "", nil, err
 			}
@@ -334,7 +342,7 @@ func renderDockerfile(uses []*use, base *use, app App) (string, []string, error)
 				stages[f.Stage] = append(stages[f.Stage], text)
 				continue
 			}
-			slots[f.Slot] = append(slots[f.Slot], text)
+			slots[slot] = append(slots[slot], text)
 		}
 	}
 	slots["from"] = append([]string{"FROM " + app.Image}, slots["from"]...)
@@ -437,7 +445,7 @@ func setOrigin(t *flktoml.Table, origin string) {
 	}
 }
 
-func steps(uses []*use, app App) ([]Step, error) {
+func steps(uses []*use, app App, res *Result) ([]Step, error) {
 	out := []Step{{Kind: snippet.NextRun, Text: "flk launch --no-deploy", Why: "registers " + app.Name + " with flk, without building or starting anything", Order: 0}}
 	for _, u := range uses {
 		d := Data{P: u.p, ID: u.key, App: app}
@@ -467,6 +475,9 @@ func steps(uses []*use, app App) ([]Step, error) {
 			until, err := execute(u.s.ID+" next until_edited", n.UntilEdited, d)
 			if err != nil {
 				return nil, err
+			}
+			if n.UnlessFound != "" && foundElsewhere(res, u.key, n.UnlessFound) {
+				continue
 			}
 			st := Step{Kind: kind, Text: strings.TrimSpace(text), Why: strings.TrimSpace(why), From: u.key, Order: order, UntilEdited: strings.TrimSpace(until)}
 			if !slices.ContainsFunc(out, func(o Step) bool { return o.Kind == st.Kind && o.Text == st.Text }) {
@@ -533,10 +544,19 @@ var funcs = template.FuncMap{
 		}
 		return fmt.Sprint(l)
 	},
-	"lower":    strings.ToLower,
-	"upper":    strings.ToUpper,
-	"has":      func(l []string, s string) bool { return slices.Contains(l, s) },
-	"contains": func(s any, sub string) bool { str, _ := s.(string); return strings.Contains(str, sub) },
+	"lower":     strings.ToLower,
+	"upper":     strings.ToUpper,
+	"has":       func(l []string, s string) bool { return slices.Contains(l, s) },
+	"contains":  func(s any, sub string) bool { str, _ := s.(string); return strings.Contains(str, sub) },
+	"hasPrefix": strings.HasPrefix,
+	"base":      path.Base,
+	"bases": func(l []string) []string {
+		out := make([]string, len(l))
+		for i, s := range l {
+			out[i] = path.Base(strings.TrimSuffix(s, "/"))
+		}
+		return out
+	},
 	"default": func(def, v any) any {
 		if v == nil || v == "" {
 			return def
@@ -643,4 +663,23 @@ func (e ParamErrors) Error() string {
 		parts = append(parts, p.Error())
 	}
 	return strings.Join(parts, "\n")
+}
+
+// foundElsewhere: text is in the Dockerfile's CMD/ENTRYPOINT lines, or in
+// a file that a use other than self writes.
+func foundElsewhere(res *Result, self, text string) bool {
+	for _, f := range res.Files {
+		if f.Path == "Dockerfile" {
+			for _, l := range strings.Split(string(f.Content), "\n") {
+				if (strings.HasPrefix(l, "CMD") || strings.HasPrefix(l, "ENTRYPOINT")) && strings.Contains(l, text) {
+					return true
+				}
+			}
+			continue
+		}
+		if f.Path != "flk.toml" && !slices.Contains(f.From, self) && strings.Contains(string(f.Content), text) {
+			return true
+		}
+	}
+	return false
 }

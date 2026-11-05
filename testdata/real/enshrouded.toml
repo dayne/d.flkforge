@@ -1,0 +1,78 @@
+# A reference recipe for enshrouded-flk, PLAN M3. Not a migration: the real app
+# stays hand-written. TestReferenceApps compares what flk reads from the
+# rendered flk.toml with the real one; enshrouded.notes.md has the differences.
+flkforge = "0.1.0"
+app = "enshrouded-flk"
+
+[[use]]
+  snippet = "core/base-wine"
+
+[[use]]
+  snippet = "core/packages"
+  params = { list = ["ca-certificates", "curl", "tzdata", "jq"] }
+
+[[use]]
+  snippet = "core/steamcmd"
+  params = { app_id = 2278520, build_id = "26430253", platform = "windows", single_stage = true, check_file = "enshrouded_server.exe" }
+
+[[use]]
+  snippet = "core/run-wrapper"
+  params = { command = ["wine64", "/server/enshrouded_server.exe"], stop = "signal:INT", stop_timeout = 90, escalate = "KILL", escalate_cmd = "wineserver -k", ready = "Switching state from LoadEcsScene to Run", hooks = ["prestart", "watch", "poststop"] }
+
+[[use]]
+  snippet = "core/user-1000"
+  params = { workdir = "/server" }
+
+[[use]]
+  snippet = "core/timezone"
+  params = { zone = "America/Anchorage" }
+
+[[use]]
+  snippet = "core/env"
+  [use.params]
+    comment = "en-run's settings (passwords are secrets: EN_PW_<GROUP>)"
+    vars = { EN_NAME = "mud Enshrouded", EN_PORT = "15637", EN_SLOTS = "8", EN_GROUPS = "Admin Friend", EN_PERMS_FRIEND = "inventories world base extend", EN_PRESET = "Default", EN_SETTINGS = "", EN_TAGS = "", EN_VOICE_CHAT = "0", EN_TEXT_CHAT = "0", EN_BANNED = "" }
+
+[[use]]
+  snippet = "core/secret"
+  id = "pw-admin"
+  params = { name = "EN_PW_ADMIN", purpose = "the Admin group's password" }
+
+[[use]]
+  snippet = "core/secret"
+  id = "pw-friend"
+  params = { name = "EN_PW_FRIEND", purpose = "the Friend group's password" }
+
+[[use]]
+  snippet = "core/volume"
+  params = { name = "endata", path = "/data", holds = "savegame/, logs/, the kept enshrouded_server.json" }
+
+[[use]]
+  snippet = "core/check-log"
+  params = { match = "Switching state from LoadEcsScene to Run", grace = "5m" }
+
+[[use]]
+  snippet = "core/backup-pause"
+  params = { verify = "bin/en-verify-backup" }
+
+[[use]]
+  snippet = "core/before-deploy"
+  params = { keep_releases = 2 }
+
+[[use]]
+  snippet = "core/restart-outer-net"
+
+[[use]]
+  snippet = "core/stdin-null"
+
+[[use]]
+  snippet = "core/bind"
+  params = { address = "10.47.11.7" }
+
+[[use]]
+  snippet = "core/vm"
+  params = { cpus = 4, memory = "6gb" }
+
+[[use]]
+  snippet = "core/service"
+  params = { port = 15637, protocol = "udp" }

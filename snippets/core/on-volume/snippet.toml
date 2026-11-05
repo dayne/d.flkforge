@@ -1,0 +1,37 @@
+id = "core/on-volume"
+version = "0.1.0"
+title = "Program on the volume"
+category = "fetch"
+summary = "Nothing in the image: the program itself lives on a volume (the server folder you already have)."
+requires = ["core/volume"]
+source = "~/minecraft.flk (fabric-server.jar, mods and world on the world volume)"
+
+[params.path]
+type = "string"
+required = true
+prompt = "Where the volume with the program is mounted (/server)"
+validate = '^/[A-Za-z0-9._/-]+$'
+
+[[dockerfile]]
+slot = "header"
+text = "# The program itself lives on the volume at {{.P.path}}, not in this image."
+
+[[next]]
+kind = "pending"
+text = "The program isn't in the image: put it on the volume mounted at {{.P.path}}"
+why = "flk volumes create NAME --from-dir DIR (a folder you have), or flk files cp; flk files chown 1000:1000 if the app runs as uid 1000"
+
+[hints]
+what = "Says the program lives on a volume rather than in the image (it adds nothing but a comment and a next step)."
+under_the_hood = """
+The image is only the runtime (Java, .NET...) and the run wrapper; the
+server folder (jars, mods, config, world) is one volume you manage like a
+directory. Upgrading the program is a file change on the volume, not a
+deploy, which is quick but means flk releases rollback can't undo it: back
+up the volume first (flk volumes backup).
+"""
+gotchas = [
+  "No rollback of the program: releases only cover the image.",
+  "A volume filled with --from-dir keeps the files' owners: chown them to the app's user (flk files chown).",
+]
+docs = ["flk help volumes", "flk help files"]

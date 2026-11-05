@@ -1,0 +1,67 @@
+# A reference recipe for opencode-sandbox, PLAN M3. Not a migration: the real app
+# stays hand-written. TestReferenceApps compares what flk reads from the
+# rendered flk.toml with the real one; opencode.notes.md has the differences.
+flkforge = "0.1.0"
+app = "opencode-sandbox"
+
+[[use]]
+  snippet = "core/base-ubuntu"
+  params = { version = "24.04" }
+
+[[use]]
+  snippet = "core/packages"
+  params = { list = ["bash", "software-properties-common", "curl", "git", "jq", "build-essential", "ca-certificates", "libssl-dev", "libreadline-dev", "zlib1g-dev", "libyaml-dev"] }
+
+[[use]]
+  snippet = "core/dockerfile-lines"
+  id = "golang"
+  [use.params]
+    slot = "install"
+    text = '''
+# Go from the backports PPA, for an up-to-date version.
+RUN add-apt-repository ppa:longsleep/golang-backports \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends golang-go \
+ && rm -rf /var/lib/apt/lists/*'''
+
+[[use]]
+  snippet = "core/user-rename"
+  params = { name = "developer", sudo = true, workdir = "/workspace" }
+
+[[use]]
+  snippet = "core/dockerfile-lines"
+  id = "opencode"
+  [use.params]
+    slot = "user"
+    text = '''
+# OpenCode, installed as developer (the installer writes to ~).
+RUN curl -fsSL https://opencode.ai/v2/install | bash
+ENV PATH="/home/developer/.opencode/bin:/home/developer/.local/bin:${PATH}"'''
+
+[[use]]
+  snippet = "core/volume"
+  params = { name = "code_workspace", path = "/workspace", holds = "the workspace" }
+
+[[use]]
+  snippet = "core/idle-cmd"
+
+[[use]]
+  snippet = "core/kill-timeout"
+  params = { seconds = 15 }
+
+[[use]]
+  snippet = "core/restart"
+  params = { policy = "on-failure" }
+
+[[use]]
+  snippet = "core/flk-toml"
+  id = "stdin"
+  params = { text = "[flk]\n  stdin = \"console\"\n" }
+
+[[use]]
+  snippet = "core/rootfs-extra"
+  params = { mb = 4096 }
+
+[[use]]
+  snippet = "core/vm"
+  params = { cpus = 2, memory = "2048mb" }

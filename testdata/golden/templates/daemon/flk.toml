@@ -1,0 +1,36 @@
+# flkt-template: made by flkforge from flkforge.toml. Change the recipe and run
+# `flkforge render`, or edit this file and stop using flkforge for it.
+app = "flkt-template"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[[restart]]
+  policy = "always"  # infrastructure: always come back
+
+# Backups freeze the VM for the copy (a second or two): the copy holds what
+# was on disk, like after a power cut. Fine for apps that write atomically
+# or journal; nobody is disconnected.
+[flk.backup]
+  mode = "pause"
+
+# A deploy waits for this port to accept connections; a machine that
+# doesn't within grace_period goes back to its previous release.
+[checks.tcp]
+  type = "tcp"
+  port = 6390
+  grace_period = "60s"
+
+[[vm]]
+  cpus = 1
+  memory = "256mb"
+
+[[mounts]]
+  source = "data"
+  destination = "/data"
+
+[[services]]
+  internal_port = 6390
+  protocol = "tcp"
+  [[services.ports]]
+    port = 6390

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dayne/d.flkforge/internal/flk"
+	"github.com/dayne/d.flkforge/internal/forge"
 	"github.com/dayne/d.flkforge/internal/recipe"
 )
 
@@ -123,28 +125,78 @@ func TestExplain(t *testing.T) {
 	}
 }
 
-func TestTemplatesRender(t *testing.T) {
+// templateSets fills each template's open params with real-looking values.
+var templateSets = map[string][]string{
+	"core/blank":       nil,
+	"core/web-service": nil,
+	"core/dev-sandbox": nil,
+	"core/daemon":      {"packages.list=redis", "service.port=6390", "check-tcp.port=6390"},
+	"core/steam-game":  {"steamcmd.app_id=896660", "run-wrapper.command=/server/valheim_server.x86_64", "service.port=2456", "check-log.match=Game server connected"},
+	"core/steam-game-windows": {"steamcmd.app_id=2278520", "run-wrapper.command=wine64,/server/enshrouded_server.exe",
+		"service.port=15637", "check-log.match=Switching state from LoadEcsScene to Run"},
+	"core/java-server": {"service.port=25565", "check-log.match=Done \\(", "check-tcp.port=25565"},
+	"core/dotnet-server": {"download-sha256.name=VS", "download-sha256.version=1.22.7",
+		"download-sha256.sha256=a7d4a520604590a96de812ee6c6baf4404d43d86cf1ec4fbac1b3a580b52c847",
+		"download-sha256.file=dist/vs_server_linux-x64_${VS_VERSION}.tar.gz", "run-wrapper.command=dotnet,VintagestoryServer.dll",
+		"service.port=42420", "check-log.match=Dedicated Server now running"},
+	"core/python-workbench": {"git-pinned.url=https://github.com/HazyResearch/ncm.git",
+		"git-pinned.ref=c70274273f489abc73832b2b98584a8483b6b203", "git-pinned.dest=/opt/ncm"},
+}
+
+// TestTemplatesGolden: PLAN M3. Every template renders, with no rule
+// findings, to the files in testdata/golden/templates/NAME; with flk on
+// PATH, flk config show reads each flk.toml with no warnings.
+func TestTemplatesGolden(t *testing.T) {
 	out, _, _ := run(t, noFlk, false, "templates", "--json")
 	var list []struct{ ID string }
-	if err := json.Unmarshal([]byte(out), &list); err != nil || len(list) < 4 {
-		t.Fatalf("%v %s", err, out)
+	if err := json.Unmarshal([]byte(out), &list); err != nil {
+		t.Fatal(err)
 	}
-	sets := map[string][]string{
-		"core/daemon":      {"packages.list=redis", "service.port=6390", "check-tcp.port=6390"},
-		"core/steam-game":  {"steamcmd.app_id=896660", "run-wrapper.command=/server/srv", "service.port=2456", "check-log.match=ready"},
-		"core/web-service": nil,
-		"core/blank":       nil,
+	if len(list) != len(templateSets) {
+		t.Errorf("%d templates, %d in templateSets: add the new ones", len(list), len(templateSets))
+	}
+	env := noFlk
+	if x, err := flk.Find(); err == nil {
+		env = func() *forge.Env { return &forge.Env{Version: Version, Flk: flk.New(x)} }
 	}
 	for _, tpl := range list {
-		args := []string{"new", filepath.Join(t.TempDir(), "app"), "--template", tpl.ID, "--yes", "--app", "flkt-x"}
-		for _, s := range sets[tpl.ID] {
-			args = append(args, "--set", s)
-		}
-		if out, errs, code := run(t, noFlk, false, args...); code != 0 {
-			t.Errorf("%s: exit %d\n%s%s", tpl.ID, code, out, errs)
-		} else if strings.Contains(out, "Rules:") {
-			t.Errorf("%s renders with rule findings:\n%s", tpl.ID, out)
-		}
+		t.Run(tpl.ID, func(t *testing.T) {
+			sets, ok := templateSets[tpl.ID]
+			if !ok {
+				t.Fatalf("no values for %s in templateSets", tpl.ID)
+			}
+			dir := filepath.Join(t.TempDir(), "app")
+			args := []string{"new", dir, "--template", tpl.ID, "--yes", "--app", "flkt-template"}
+			for _, s := range sets {
+				args = append(args, "--set", s)
+			}
+			out, errs, code := run(t, env, false, args...)
+			if code != 0 {
+				t.Fatalf("exit %d\n%s%s", code, out, errs)
+			}
+			if strings.Contains(out, "Rules:") {
+				t.Errorf("rule findings:\n%s", out)
+			}
+			if strings.Contains(out, "flk config show warns") {
+				t.Errorf("flk warns:\n%s", out)
+			}
+			for _, f := range []string{"Dockerfile", "flk.toml"} {
+				got := read(t, dir, f)
+				path := filepath.Join("../../testdata/golden/templates", strings.TrimPrefix(tpl.ID, "core/"), f)
+				if *update {
+					os.MkdirAll(filepath.Dir(path), 0o755)
+					os.WriteFile(path, []byte(got), 0o644)
+					continue
+				}
+				want, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatalf("%v (make golden writes it)", err)
+				}
+				if got != string(want) {
+					t.Errorf("%s differs from %s (make golden; review with git diff):\n%s", f, path, got)
+				}
+			}
+		})
 	}
 }
 

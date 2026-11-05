@@ -1,0 +1,40 @@
+title = ".NET game server"
+summary = "A .NET server from a pinned tarball (sha256-checked) under flk-run, as uid 1000, data on a volume, stop-mode backups (like vintagestory-flk)."
+
+[[use]]
+  snippet = "core/base-dotnet"
+
+[[use]]
+  snippet = "core/download-sha256"
+  params = { format = "tar.gz", dest = "/server" }
+
+[[use]]
+  snippet = "core/run-wrapper"
+  params = { stop_timeout = 100, kill_margin = 20, hooks = ["watch"] }
+
+[[use]]
+  snippet = "core/user-1000"
+  params = { workdir = "/server" }
+
+[[use]]
+  snippet = "core/volume"
+
+[[use]]
+  snippet = "core/service"
+
+[[use]]
+  snippet = "core/check-log"
+  params = { grace = "5m" }
+
+[[use]]
+  snippet = "core/backup-stop"
+
+[[use]]
+  snippet = "core/before-deploy"
+
+[[use]]
+  snippet = "core/restart-outer-net"
+
+[[use]]
+  snippet = "core/vm"
+  params = { cpus = 2, memory = "4gb" }

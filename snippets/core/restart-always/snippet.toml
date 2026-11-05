@@ -3,13 +3,20 @@ version = "0.1.0"
 title = "Restart: always come back"
 category = "restart"
 summary = "flk restarts the VM after any exit, for infrastructure that must stay up (a broker, a database)."
-conflicts = ["core/restart-outer-net"]
+conflicts = ["core/restart-outer-net", "core/restart"]
 source = "~/mqtt.flk/flk.toml"
+
+[params.retries]
+type = "int"
+min = 1
+prompt = "Restarts in a row before flk gives up (default 10)"
 
 [[flktoml]]
 text = '''
 [[restart]]
   policy = "always"  # infrastructure: always come back
+{{- if .P.retries}}
+  retries = {{.P.retries}}{{end}}
 '''
 
 [hints]

@@ -1,0 +1,30 @@
+id = "core/bind"
+version = "0.1.0"
+title = "Bind to one host address"
+category = "network"
+summary = "Forward this app's host ports on one of the host's addresses only (or all of them)."
+source = "~/enshrouded.flk/flk.toml (10.47.11.7), ~/flk/examples/reference/flk.toml"
+
+[params.address]
+type = "string"
+required = true
+prompt = "A host address (10.47.11.7), or all"
+validate = '^(all|[0-9]{1,3}(\.[0-9]{1,3}){3}|[0-9a-fA-F:]+)$'
+
+[[flktoml]]
+text = '''
+[flk]
+  bind = {{toml .P.address}}  # host address for this app's forwarded ports
+'''
+
+[hints]
+what = "Sets [flk] bind: which host address the app's [[services]] and http_port are forwarded on."
+under_the_hood = """
+By default flk forwards on the host's address (host.toml). bind picks
+another address the host already has, such as a second LAN address for
+a game that needs its own (two servers on the same port), or "all".
+flk doesn't add the address to the host: that's host networking (a root
+step, outside flkforge).
+"""
+gotchas = ["The address must already be on the host (ip addr), or the forward never answers: flk ports shows it."]
+docs = ["flk help --all  (Config: [flk] bind)", "flk ports", "flkforge explain lan-address"]

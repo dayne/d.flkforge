@@ -1,0 +1,32 @@
+title = "Dev sandbox"
+summary = "An Ubuntu box to work in: your own user with sudo, home and workspace on volumes (logins survive deploys), idle until you flk ssh console in (like opencode-sandbox)."
+
+[[use]]
+  snippet = "core/base-ubuntu"
+
+[[use]]
+  snippet = "core/packages"
+  params = { list = ["git", "curl", "ca-certificates", "build-essential", "less", "vim-tiny"] }
+
+[[use]]
+  snippet = "core/user-rename"
+  params = { name = "dev", sudo = true, workdir = "/workspace" }
+
+[[use]]
+  snippet = "core/volume"
+  params = { name = "workspace", path = "/workspace", size = 10, holds = "your projects" }
+
+[[use]]
+  snippet = "core/home-volume"
+
+[[use]]
+  snippet = "core/idle-cmd"
+  params = { before = "flk-seed-home" }
+
+[[use]]
+  snippet = "core/rootfs-extra"
+  params = { mb = 4096 }
+
+[[use]]
+  snippet = "core/vm"
+  params = { cpus = 2, memory = "2gb" }

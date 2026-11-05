@@ -1,0 +1,71 @@
+id = "core/git-pinned"
+version = "0.1.0"
+title = "Pinned git clone (plus a patch)"
+category = "fetch"
+summary = "Clone a repository at a pinned commit, and apply a patch of your own if you have one."
+multi = true
+requires = ["category:base"]
+source = "~/ncm.flk/Dockerfile"
+packages = "git ca-certificates"
+
+[params.url]
+type = "string"
+required = true
+prompt = "Repository URL (https)"
+validate = '^https://'
+
+[params.ref]
+type = "string"
+required = true
+prompt = "The commit to pin (a full sha; a tag works but can move)"
+validate = '^[A-Za-z0-9._/-]+$'
+
+[params.arg]
+type = "string"
+default = "GIT_REF"
+prompt = "Build ARG for the ref (NCM_REF)"
+validate = '^[A-Z][A-Z0-9_]*$'
+
+[params.dest]
+type = "string"
+required = true
+prompt = "Where to clone it in the image (/opt/ncm)"
+validate = '^/[A-Za-z0-9._/-]+$'
+
+[params.patch]
+type = "string"
+prompt = "A patch file in the app directory to apply (git apply), optional"
+validate = '^[A-Za-z0-9._/-]+$'
+
+[[dockerfile]]
+slot = "fetch"
+text = '''
+# Pinned, so rebuilds are reproducible; bump {{.P.arg}} to pick up upstream changes.
+ARG {{.P.arg}}={{.P.ref}}
+RUN git clone {{.P.url}} {{.P.dest}} \
+ && git -C {{.P.dest}} checkout "${{.P.arg}}"
+{{- if .P.patch}}
+
+# git apply fails the build if a new {{.P.arg}} moves the patched lines:
+# regenerate the patch then.
+COPY {{.P.patch}} /tmp/{{base .P.patch}}
+RUN git -C {{.P.dest}} apply /tmp/{{base .P.patch}} && rm /tmp/{{base .P.patch}}{{end}}'''
+
+[[next]]
+kind = "pending"
+when = "{{if .P.patch}}true{{end}}"
+text = "{{.P.patch}}: yours to provide (git diff > {{.P.patch}} in a checkout at {{.P.ref}})"
+why = "the build applies it after the checkout"
+
+[hints]
+what = "Clones a repository at a pinned commit, optionally applies your patch."
+under_the_hood = """
+The clone runs at build time; the pinned ref is a build ARG, so the layer
+is cached until you change it. A patch that no longer applies fails the
+build instead of producing a half-patched release.
+"""
+gotchas = [
+  "Pin a commit sha: tags and branches move.",
+  "The clone includes .git; fine for a workbench, wasteful for a service image.",
+]
+docs = ["flk help --all  (Config: [build] args)"]

@@ -24,7 +24,7 @@ test: ## run the tests, golden ones included (the flk checks skip without flk)
 	go test ./...
 
 golden: ## rewrite the golden files after an intended change (review with git diff)
-	go test ./internal/cli -run Golden -update
+	go test ./internal/cli -run 'Golden' -update
 	@git diff --stat -- testdata
 
 check: ## what CI would run: gofmt, vet, build, race tests

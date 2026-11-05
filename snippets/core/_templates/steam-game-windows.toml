@@ -1,0 +1,48 @@
+title = "Steam game server (Windows, under Wine)"
+summary = "A Windows-only Steam server under wine64, downloaded in one stage, stopped with SIGINT (Wine's Ctrl-C), UDP, pause backups (like enshrouded-flk)."
+
+[[use]]
+  snippet = "core/base-wine"
+
+[[use]]
+  snippet = "core/packages"
+  params = { list = ["ca-certificates", "tzdata"] }
+
+[[use]]
+  snippet = "core/steamcmd"
+  params = { platform = "windows", single_stage = true }
+
+[[use]]
+  snippet = "core/run-wrapper"
+  params = { stop = "signal:INT", stop_timeout = 90, escalate = "KILL", escalate_cmd = "wineserver -k", hooks = ["prestart", "watch"] }
+
+[[use]]
+  snippet = "core/user-1000"
+  params = { workdir = "/server" }
+
+[[use]]
+  snippet = "core/volume"
+
+[[use]]
+  snippet = "core/service"
+  params = { protocol = "udp" }
+
+[[use]]
+  snippet = "core/check-log"
+  params = { grace = "5m" }
+
+[[use]]
+  snippet = "core/backup-pause"
+
+[[use]]
+  snippet = "core/before-deploy"
+
+[[use]]
+  snippet = "core/restart-outer-net"
+
+[[use]]
+  snippet = "core/stdin-null"
+
+[[use]]
+  snippet = "core/vm"
+  params = { cpus = 4, memory = "6gb" }

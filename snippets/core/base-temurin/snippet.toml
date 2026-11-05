@@ -1,0 +1,35 @@
+id = "core/base-temurin"
+version = "0.1.0"
+title = "Java (Eclipse Temurin) base"
+category = "base"
+summary = "A Java runtime on Ubuntu: for Minecraft and other JVM servers."
+source = "~/minecraft.flk/Dockerfile"
+
+[params.version]
+type = "string"
+default = "25"
+prompt = "Java version (25, 21...)"
+validate = '^[0-9]+$'
+
+[params.jdk]
+type = "bool"
+default = false
+prompt = "The full JDK instead of the JRE (only to compile things in the image)"
+
+[base]
+image = "docker.io/library/eclipse-temurin:{{.P.version}}-{{if .P.jdk}}jdk{{else}}jre{{end}}"
+family = "apt"
+user = "ubuntu"
+
+[hints]
+what = "Starts the image from Eclipse Temurin's Java runtime, which is Ubuntu-based."
+under_the_hood = """
+java is on the PATH. The JVM takes its heap from the VM's memory, so the
+heap (-Xmx) must fit inside [[vm]] memory with room for the JVM itself and
+the kernel: flkforge's jvm-heap rule checks it. The ubuntu user is uid 1000.
+"""
+gotchas = [
+  "Set -Xms and -Xmx explicitly: the JVM's default heap is a quarter of the VM's memory.",
+  "Leave a GB or more above the heap for the JVM's own memory (metaspace, threads, GC).",
+]
+docs = ["flk help --all  (Config: [[vm]])", "flk machine stats"]

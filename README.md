@@ -37,10 +37,11 @@ commands to run next (`flk launch --no-deploy`, `flk volumes create ...`,
 Later: a **hub** of shared snippets and whole-app recipes
 (`flkforge hub search valheim`).
 
-Status: M2 (2026-11-04). The command line is complete for agents and
-scripts: templates, add/rm/set, check, explain, `--json` everywhere, and
-flk-run (the run engine). The wizard (`new` and `edit` in a terminal)
-and the rest of the catalog are still to come: `PLAN.md`.
+Status: M3 (2026-11-04). The command line is complete for agents and
+scripts, with the full catalog: 52 snippets and 9 templates (daemon,
+web-service, steam-game, steam-game-windows, java-server, dotnet-server,
+python-workbench, dev-sandbox, blank), all learned from the apps on this
+host. The wizard (`new` and `edit` in a terminal) is next: `PLAN.md`.
 
     make install                   # ~/.local/bin/flkforge
     flkforge new ~/myapp.flk --recipe testdata/hello.toml --yes --app flkt-myapp

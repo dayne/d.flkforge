@@ -1,0 +1,64 @@
+id = "core/checksum-manifest"
+version = "0.1.0"
+title = "A folder of files, checked by a manifest"
+category = "fetch"
+summary = "Copy a folder (a mod set, plugins) into the image, exactly the files in a sha256 manifest, each one checked."
+multi = true
+requires = ["category:base"]
+source = "~/vintagestory.flk/Dockerfile (the mod set)"
+
+[params.from]
+type = "string"
+required = true
+prompt = "The folder in the app directory ($ARG works: dist/mods-${MODS}/)"
+validate = '^[A-Za-z0-9._/${}-]+/$'
+
+[params.manifest]
+type = "string"
+required = true
+prompt = "The manifest in the app directory, sha256sum's output for those files (mods/${MODS}.sha256)"
+validate = '^[A-Za-z0-9._/${}-]+$'
+
+[params.dest]
+type = "string"
+required = true
+prompt = "Where the files go in the image (/opt/vs-mods)"
+validate = '^/[A-Za-z0-9._/-]+$'
+
+[params.arg]
+type = "string"
+prompt = "A build ARG naming the set, NAME=VALUE (MODS=1.22.7-2), used in from and manifest"
+validate = '^[A-Z][A-Z0-9_]*=[A-Za-z0-9._-]+$'
+
+[[dockerfile]]
+slot = "install"
+text = '''
+# Exactly the files in the manifest, each one checked: a missing, extra-named
+# or changed file fails the build.
+{{- if .P.arg}}
+ARG {{.P.arg}}{{end}}
+COPY {{.P.manifest}} {{.P.dest}}.sha256
+COPY {{.P.from}} /tmp/manifest-files/
+RUN mkdir -p {{.P.dest}} \
+ && cd /tmp/manifest-files \
+ && sha256sum -c --quiet {{.P.dest}}.sha256 \
+ && cut -d' ' -f3- {{.P.dest}}.sha256 | xargs -d '\n' mv -t {{.P.dest}}/ \
+ && rm -rf /tmp/manifest-files \
+ && chmod 644 {{.P.dest}}/* \
+ && echo "$(ls {{.P.dest}} | wc -l) files in {{.P.dest}}"'''
+
+[[next]]
+kind = "pending"
+text = "{{.P.from}} and {{.P.manifest}}: yours to provide (make the manifest with: cd FOLDER && sha256sum * > MANIFEST)"
+why = "the build copies exactly the files the manifest lists"
+
+[hints]
+what = "Copies a set of files into the image after checking each against a manifest."
+under_the_hood = """
+The manifest (sha256sum's output) is the list: only files it names are
+installed, and each must match its sum. The set is part of the release,
+so a game version and the mods made for it deploy, and roll back,
+together.
+"""
+gotchas = ["File names with spaces work (cut -f3-), but not names with newlines."]
+docs = ["flk help releases", "~/vintagestory.flk/upgrade-process-and-notes.md"]

@@ -1,0 +1,70 @@
+# flkt-template: made by flkforge from flkforge.toml. Change the recipe and run
+# `flkforge render`, or edit this file and stop using flkforge for it.
+app = "flkt-template"
+
+# flk-run stops the server cleanly within stop_timeout (100s); give it
+# that, plus a margin, before flk kills the VM.
+kill_timeout = 120
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  # flk-run, the run engine (see flk-run for details)
+  RUN_STOP = "console:stop"
+  STOP_TIMEOUT = "100"    # then SIGTERM (< kill_timeout)
+  RESTART_DELAY = "10"    # seconds before restarting after a crash
+  MAX_RESTARTS = "5"      # give up after this many restarts...
+  RESTART_WINDOW = "600"  # ...within this many seconds
+
+  # the server (see the run-wrapper command)
+  JAVA_HEAP = "4G"
+  JAVA_OPTS = "-XX:+UseG1GC"
+  SERVER_JAR = "server.jar"
+
+# The run wrapper restarts the server itself and gives up on a crash loop
+# (exits 1). flk's restart policy is only the outer net: restart the VM
+# once, then leave it stopped for a human.
+[[restart]]
+  policy = "on-failure"
+  retries = 1
+
+[flk]
+  keep_releases = 3  # images kept for flk releases rollback (default 2)
+
+# Backups copy the volume while the server runs: the pre hooks make it save
+# and stop writing first, the post hooks turn writing back on (they run
+# even if the backup failed). No downtime, and nothing unsaved is lost.
+[flk.backup]
+  mode = "live"
+  pre = [{ console = "save-off" }, { console = "save-all flush", wait = "Saved the game", timeout = 300 }]
+  post = [{ console = "save-on" }]
+  before_deploy = true
+
+# A deploy waits for this line on the console; a machine that doesn't log
+# it within grace_period goes back to its previous release.
+[checks.ready]
+  type = "log"
+  match = "Done \\("
+  grace_period = "5m"
+
+# A deploy waits for this port to accept connections; a machine that
+# doesn't within grace_period goes back to its previous release.
+[checks.port]
+  type = "tcp"
+  port = 25565
+  grace_period = "5m"
+
+[[vm]]
+  cpus = 2
+  memory = "6gb"
+
+[[mounts]]
+  source = "world"
+  destination = "/server"
+
+[[services]]
+  internal_port = 25565
+  protocol = "tcp"
+  [[services.ports]]
+    port = 25565

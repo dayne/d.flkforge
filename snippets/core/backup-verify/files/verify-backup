@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# verify-backup: flk's [flk.backup] verify hook for this app's volume.
+# flk runs it on the host after e2fsck on every new backup (flk volumes
+# backup, before_deploy) and on flk volumes verify, with FLK_BACKUP = the
+# backup's image file. Exit 0 = good. It reads the image with debugfs: no
+# mount, no root. Written once by flkforge (core/backup-verify); it's yours:
+# check what proves a backup can be restored (the newest save is complete).
+set -euo pipefail
+export PATH="/usr/sbin:/sbin:$PATH"   # debugfs
+IMG=${FLK_BACKUP:?FLK_BACKUP (the backup image) not set}
+fail() { echo "verify-backup: FAIL: $*" >&2; exit 1; }
+{{- range .P.paths}}
+debugfs -R "stat {{.}}" "$IMG" 2>/dev/null | grep -q '^Inode:' || fail "{{.}} isn't in the backup"
+{{- end}}
+echo "verify-backup: ok{{if .P.paths}}: {{join .P.paths ", "}} present{{end}}"

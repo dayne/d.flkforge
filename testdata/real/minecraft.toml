@@ -1,0 +1,78 @@
+# A reference recipe for minecraft-flk, PLAN M3. Not a migration: the real app
+# stays hand-written. TestReferenceApps compares what flk reads from the
+# rendered flk.toml with the real one; minecraft.notes.md has the differences.
+flkforge = "0.1.0"
+app = "minecraft-flk"
+
+[[use]]
+  snippet = "core/base-temurin"
+  params = { version = "25" }
+
+[[use]]
+  snippet = "core/packages"
+  params = { list = ["curl"] }
+
+[[use]]
+  snippet = "core/run-wrapper"
+  [use.params]
+    command = ["bash", "-c", "exec java -Xms$MC_HEAP -Xmx$MC_HEAP $MC_JAVA_OPTS -jar fabric-server.jar nogui"]
+    stop = "console:stop"
+    stop_timeout = 100
+    kill_margin = 20
+    ready = "For help, type \"help\""
+    hooks = ["watch"]
+
+[[use]]
+  snippet = "core/user-1000"
+  params = { workdir = "/server" }
+
+[[use]]
+  snippet = "core/timezone"
+  params = { zone = "America/Anchorage" }
+
+[[use]]
+  snippet = "core/env"
+  [use.params]
+    comment = "the JVM (see the run-wrapper command)"
+    vars = { MC_HEAP = "8G", MC_JAVA_OPTS = "-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1 -XX:+UseCompactObjectHeaders" }
+
+[[use]]
+  snippet = "core/volume"
+  params = { name = "world", path = "/server", holds = "the server folder: fabric-server.jar, mods, world2-201803" }
+
+[[use]]
+  snippet = "core/on-volume"
+  params = { path = "/server" }
+
+[[use]]
+  snippet = "core/check-log"
+  params = { match = "Started Geyser on UDP port 19132", grace = "5m" }
+
+[[use]]
+  snippet = "core/check-tcp"
+  params = { name = "port", port = 25565, grace = "5m" }
+
+[[use]]
+  snippet = "core/backup-live-console"
+  params = { pre = ["save-off", "save-all flush"], wait = "Saved the game", timeout = 300, post = ["save-on"], verify = "bin/mc-verify-backup" }
+
+[[use]]
+  snippet = "core/before-deploy"
+  params = { keep_releases = 3 }
+
+[[use]]
+  snippet = "core/restart-outer-net"
+
+[[use]]
+  snippet = "core/vm"
+  params = { cpus = 4, memory = "11gb" }
+
+[[use]]
+  snippet = "core/service"
+  id = "java"
+  params = { port = 25565, protocol = "tcp", comment = "Java edition" }
+
+[[use]]
+  snippet = "core/service"
+  id = "bedrock"
+  params = { port = 19132, protocol = "udp", comment = "Bedrock edition (Geyser)" }

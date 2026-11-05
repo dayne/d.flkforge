@@ -1,0 +1,30 @@
+id = "core/idle-cmd"
+version = "0.1.0"
+title = "Idle (a VM to work in)"
+category = "wrapper"
+summary = "The app does nothing but stay up and exit cleanly on SIGTERM: a machine to flk ssh console into."
+requires = ["category:base"]
+source = "~/opencode.flk/Dockerfile"
+
+[params.before]
+type = "string"
+prompt = "A command to run first (optional), such as flk-seed-home"
+validate = '^[A-Za-z0-9 ._/=-]+$'
+
+[[dockerfile]]
+slot = "entry"
+text = '''
+# Stay up for flk ssh console / flk exec; exit at once on flk's SIGTERM.
+CMD ["/bin/sh", "-c", "{{if .P.before}}{{.P.before}} && {{end}}trap 'exit 0' TERM; while true; do sleep 3600 & wait $!; done"]'''
+
+[hints]
+what = "Makes the VM's main process an idle loop that exits on SIGTERM."
+under_the_hood = """
+A flk machine runs while its main process does. For a sandbox or
+workbench there's no server to run, so the main process just waits:
+sleep in the background plus wait, so the trap runs at once when flk's
+SIGTERM arrives and the machine stops without waiting out kill_timeout.
+You work in it with flk ssh console or flk exec, through flk's agent.
+"""
+gotchas = ["exec sleep infinity as PID-of-the-app ignores SIGTERM in some images: flk then waits kill_timeout and kills the VM. The trap avoids that."]
+docs = ["flk help ssh", "flk help exec"]

@@ -1,0 +1,98 @@
+# A reference recipe for mqtt-flk, PLAN M3. Not a migration: the real app
+# stays hand-written. TestReferenceApps compares what flk reads from the
+# rendered flk.toml with the real one; mqtt.notes.md has the differences.
+flkforge = "0.1.0"
+app = "mqtt-flk"
+
+[[use]]
+  snippet = "core/base-image"
+  params = { image = "docker.io/library/eclipse-mosquitto:2.1.2-alpine", family = "apk", busybox = true, clear_entrypoint = true }
+
+[[use]]
+  snippet = "core/timezone"
+  params = { zone = "America/Anchorage" }
+
+[[use]]
+  snippet = "core/copy-files"
+  id = "config"
+  params = { files = ["mosquitto.conf"], dest = "/mosquitto/config/" }
+
+[[use]]
+  snippet = "core/copy-files"
+  id = "acl"
+  params = { files = ["acl"], dest = "/mosquitto/config/", owner = "mosquitto:mosquitto", mode = "600" }
+
+[[use]]
+  snippet = "core/start-script"
+  [use.params]
+    file = "mqtt-run"
+    dest = "/usr/local/bin/mqtt-run"
+    body = '''
+#!/bin/sh
+# mqtt-run: the VM's main process. Builds mosquitto's password file from
+# flk secrets, then runs the broker (it drops to the mosquitto user).
+#
+# Users: one secret per user, MQTT_PASSWORD_<NAME>=<password>; the user name
+# is NAME lowercased (MQTT_PASSWORD_GAMES -> games). Add one with
+#   flk secrets set MQTT_PASSWORD_NAME=-    (and a section in ./acl)
+set -eu
+
+conf=/mosquitto/config
+pw=$conf/passwd
+umask 077
+# A fresh root-owned file: truncating last boot's (mosquitto-owned) one makes
+# mosquitto_passwd, running as root, warn "owner is not root" for every user.
+rm -f "$pw"
+: > "$pw"
+n=0
+for var in $(env | sed -n 's/^\(MQTT_PASSWORD_[A-Z0-9_]*\)=.*/\1/p'); do
+  user=$(echo "${var#MQTT_PASSWORD_}" | tr 'A-Z' 'a-z')
+  eval "pass=\${$var}"
+  mosquitto_passwd -b "$pw" "$user" "$pass"
+  unset "$var"
+  n=$((n + 1))
+done
+chown mosquitto:mosquitto "$pw"
+chmod 600 "$pw"
+echo "[mqtt-run] $n user(s) from secrets"
+[ "$n" -gt 0 ] || echo "[mqtt-run] warning: no MQTT_PASSWORD_* secrets: nobody can log in"
+
+chown -R mosquitto:mosquitto /mosquitto/data
+exec /usr/sbin/mosquitto -c $conf/mosquitto.conf
+'''
+
+[[use]]
+  snippet = "core/kill-timeout"
+  params = { seconds = 15 }
+
+[[use]]
+  snippet = "core/restart-always"
+  params = { retries = 10 }
+
+[[use]]
+  snippet = "core/check-log"
+  params = { match = "mosquitto version [0-9.]+ running", grace = "60s" }
+
+[[use]]
+  snippet = "core/check-tcp"
+  params = { name = "port", port = 1883, grace = "60s" }
+
+[[use]]
+  snippet = "core/backup-pause"
+  params = { keep = 7 }
+
+[[use]]
+  snippet = "core/before-deploy"
+  params = { keep_releases = 3 }
+
+[[use]]
+  snippet = "core/vm"
+  params = { cpus = 1, memory = "256mb" }
+
+[[use]]
+  snippet = "core/volume"
+  params = { name = "mqttdata", path = "/mosquitto/data", holds = "persistence db: retained messages, sessions" }
+
+[[use]]
+  snippet = "core/service"
+  params = { port = 1883, protocol = "tcp" }

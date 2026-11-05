@@ -1,0 +1,37 @@
+id = "core/restart"
+version = "0.1.0"
+title = "Restart policy"
+category = "restart"
+summary = "Set [[restart]] yourself: on-failure, always or never, and how many tries."
+conflicts = ["core/restart-always", "core/restart-outer-net"]
+source = "~/flk/examples/reference/flk.toml"
+
+[params.policy]
+type = "enum"
+values = ["on-failure", "always", "never"]
+default = "on-failure"
+prompt = "When flk restarts the VM: after a failure, after any exit, or never"
+
+[params.retries]
+type = "int"
+min = 1
+prompt = "Restarts in a row before flk gives up (default 10)"
+
+[[flktoml]]
+text = '''
+[[restart]]
+  policy = {{toml .P.policy}}
+{{- if .P.retries}}
+  retries = {{.P.retries}}{{end}}
+'''
+
+[hints]
+what = "Sets [[restart]] policy and retries."
+under_the_hood = """
+When the VM's main process exits (other than through flk machine stop),
+flk looks at the policy: on-failure restarts after a non-zero exit or a
+crash, always after any exit, never not at all; up to retries times in a
+row (default 10), with backoff up to 60s between tries.
+"""
+gotchas = ["With a run wrapper that restarts the server itself, use core/restart-outer-net (retries = 1)."]
+docs = ["flk help --all  (Config: [[restart]])"]

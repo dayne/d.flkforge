@@ -1,0 +1,60 @@
+# flkt-template: made by flkforge from flkforge.toml. Change the recipe and run
+# `flkforge render`, or edit this file and stop using flkforge for it.
+app = "flkt-template"
+
+# flk-run stops the server cleanly within stop_timeout (90s); give it
+# that, plus a margin, before flk kills the VM.
+kill_timeout = 120
+
+[build]
+  dockerfile = "Dockerfile"
+
+  # The Steam build this release runs. Bump it to upgrade.
+  args = { STEAM_BUILDID = "latest" }
+
+[env]
+  # flk-run, the run engine (see flk-run for details)
+  RUN_STOP = "signal:INT"
+  STOP_TIMEOUT = "90"     # then SIGTERM (< kill_timeout)
+  RESTART_DELAY = "10"    # seconds before restarting after a crash
+  MAX_RESTARTS = "5"      # give up after this many restarts...
+  RESTART_WINDOW = "600"  # ...within this many seconds
+
+# The run wrapper restarts the server itself and gives up on a crash loop
+# (exits 1). flk's restart policy is only the outer net: restart the VM
+# once, then leave it stopped for a human.
+[[restart]]
+  policy = "on-failure"
+  retries = 1
+
+[flk]
+  keep_releases = 3  # images kept for flk releases rollback (default 2)
+  stdin = "null"     # the app has no console input
+
+# Backups freeze the VM for the copy (a second or two): the copy holds what
+# was on disk, like after a power cut. Fine for apps that write atomically
+# or journal; nobody is disconnected.
+[flk.backup]
+  mode = "pause"
+  before_deploy = true
+
+# A deploy waits for this line on the console; a machine that doesn't log
+# it within grace_period goes back to its previous release.
+[checks.ready]
+  type = "log"
+  match = "Game server connected"
+  grace_period = "5m"
+
+[[vm]]
+  cpus = 2
+  memory = "4gb"
+
+[[mounts]]
+  source = "data"
+  destination = "/data"
+
+[[services]]
+  internal_port = 2456
+  protocol = "udp"
+  [[services.ports]]
+    port = 2456

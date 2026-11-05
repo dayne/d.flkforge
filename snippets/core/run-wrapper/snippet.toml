@@ -27,7 +27,14 @@ default = 90
 min = 1
 max = 270
 prompt = "Seconds the server gets to stop before flk-run forces it"
-hint = "flkforge sets kill_timeout to this plus 30, so flk doesn't kill the VM first (flk allows at most 300)."
+hint = "flkforge sets kill_timeout to this plus kill_margin (30), so flk doesn't kill the VM first (flk allows at most 300)."
+
+[params.kill_margin]
+type = "int"
+default = 30
+min = 10
+prompt = "Seconds kill_timeout gets on top of stop_timeout"
+hint = "flk kills the VM kill_timeout after SIGTERM; the margin covers the escalation and the wrapper's own exit."
 
 [params.escalate]
 type = "enum"
@@ -132,7 +139,7 @@ when = "{{not .P.exec}}"
 text = '''
 # flk-run stops the server cleanly within stop_timeout ({{.P.stop_timeout}}s); give it
 # that, plus a margin, before flk kills the VM.
-kill_timeout = {{add .P.stop_timeout 30}}
+kill_timeout = {{add .P.stop_timeout .P.kill_margin}}
 '''
 
 [[flktoml]]

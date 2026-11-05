@@ -117,6 +117,19 @@ func init() {
 				{Name: "unset", Arg: "PARAM", Multi: true, Help: "Remove a param (back to its default)"},
 			}, editOpts...),
 			Notes: []string{"USE is the use's id: its snippet's name unless the recipe gives it one (flkforge.toml's [[use]] id)."}},
+		{Name: "import", Args: "SRC", run: cmdImport, JSON: true,
+			Summary: "Build a recipe from a hand-written app (best effort): prints it, or --to DIR / --in-place",
+			Opts: []Opt{
+				{Name: "to", Arg: "DIR", Help: "Render the recipe into a new DIR and say whether flk reads its flk.toml like SRC's"},
+				{Name: "in-place", Help: "Write SRC/flkforge.toml only (no other file changes)"},
+				{Name: "app", Arg: "NAME", Help: "App name (default: SRC's)"},
+				jsonOpt,
+			},
+			Notes: []string{
+				"Reads SRC's flk.toml, Dockerfile and the files they copy; never changes them (--in-place adds flkforge.toml only).",
+				"What matches a snippet becomes it; the rest is kept as is in core/flk-toml and core/dockerfile-lines. Every decision is a note.",
+				"Without --to or --in-place the recipe goes to stdout and the notes to stderr: flkforge import ~/app > recipe.toml.",
+			}},
 		{Name: "snippets", Args: "[SUB] [ID]", run: cmdSnippets, JSON: true,
 			Summary: "List the snippets (snippets [list]), or show one's params (snippets show ID)",
 			Opts: []Opt{

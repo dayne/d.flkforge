@@ -10,8 +10,8 @@ source = "~/mqtt.flk/Dockerfile (mosquitto.conf, acl)"
 [params.files]
 type = "list"
 required = true
-prompt = "Files or directories, relative to the app directory"
-validate = '^[A-Za-z0-9._/-]+$'
+prompt = "Files or directories, relative to the app directory (${ARG} works)"
+validate = '^[A-Za-z0-9._/${}-]+$'
 
 [params.dest]
 type = "string"

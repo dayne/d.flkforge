@@ -21,6 +21,7 @@ what to watch out for.
     flkforge check                 # recipe, files and flk agree; ports, secrets, deploy state
     flkforge snippets [show ID]    # the catalog (--json)
     flkforge explain run-wrapper   # a snippet, a rule, a flk.toml key, or an ask that isn't a snippet (gpu)
+    flkforge import ~/old.flk      # a recipe from a hand-written app (best effort; --to DIR, --in-place)
 
 What it writes in the app directory:
 

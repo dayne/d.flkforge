@@ -235,3 +235,17 @@ Acceptance (PLAN M4):
   change a multi-line one (a start script's body). Tested with a hook,
   and in tmux with a script as the editor: the terminal went over and
   back, and the body and preview changed.
+
+## 2026-11-05: import (PLAN, Later)
+
+`flkforge import SRC [--to DIR | --in-place]` (SPEC 9.1). On the seven
+real apps (read-only) every import renders and flk reads its flk.toml
+exactly like the original; the tests also check the rebuilt Dockerfile
+keeps the final USER and WORKDIR and copies files before the RUNs that
+use them. Those checks caught four ordering bugs while building it (a
+patch copied after the RUN that applied it, ncm; a WORKDIR the final one
+landed before, opencode; WORKDIR reset by a USER switch, enshrouded; a
+chmod before the COPY of its file, mqtt), all fixed. The imported mqtt
+Dockerfile built with podman (image removed after). Also: flk's r1 is on
+main (udp-only-check's reason updated; bases point at flk help
+dockerfile).

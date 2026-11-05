@@ -123,8 +123,7 @@ that's no longer needed. Record each one in `BUGS.flk.md` (Status) and
 
 ## Later
 
-- Import: build a recipe from an existing hand-written app (best effort,
-  matching known snippets). Low priority: the real apps stay hand-written.
+- ~~Import~~: done 2026-11-05 (`flkforge import`, SPEC 9.1).
 - The hub: a third `Source`, plus `hub search|show|pull|publish`. Design it
   first (`TODO.md`). Turn on version and sha256 locking then.
 - A lazyflk hook ("new app…" runs flkforge). Propose it to the lazyflk

@@ -621,6 +621,38 @@ Exit codes: 0 ok, 1 failed or needs attention, 2 bad usage. Copy flk's
 approach of keeping commands and options in one table that drives parsing
 and help (`~/flk/lib/flk/commands.rb`).
 
+### 9.1 Import (built 2026-11-05)
+
+`flkforge import SRC` builds a recipe from a hand-written app, best
+effort (`internal/importer`). flk.toml: each key or table that matches a
+snippet becomes it (env, TZ, restart, the [flk] settings, backups
+including live console hooks, checks, [[vm]], [[mounts]], [[services]],
+[http_service]); the rest goes into one core/flk-toml use, as is.
+Dockerfile: the final stage's FROM picks a base (short names written in
+full), install-only RUN lines become core/packages (except after an
+added apt repository: those stay in place), a steamcmd download (its own
+stage or not) core/steamcmd, `usermod -l` core/user-rename, USER and
+WORKDIR core/user-1000, ENV core/image-env, a CMD that's a copied script
+core/start-script with the script as its body, an idle loop
+core/idle-cmd, other COPYs core/copy-files; anything else stays as is in
+core/dockerfile-lines, in its original order: root steps before the
+app's USER in the install slot, after a snippet's COPY in the dirs slot,
+as the user in the user slot. A COPY or WORKDIR a kept RUN depends on
+stays with it. Every decision is a note.
+
+- Default: the recipe on stdout, the notes on stderr; nothing written.
+- `--to DIR`: renders it as a new app in DIR, says whether flk reads its
+  flk.toml exactly like SRC's (`flk config show`), and lists the files
+  the Dockerfile copies that the build will need from SRC.
+- `--in-place`: writes SRC/flkforge.toml only; `render --dry-run` then
+  shows how the files would change, and `render --force` adopts them.
+
+Tested on all seven real apps (read-only): each recipe renders, flk reads
+its flk.toml exactly like the original's, and the rebuilt Dockerfile
+keeps the final USER and WORKDIR and puts every COPY before the RUNs
+that use it (the importer's tests). The imported mqtt Dockerfile was
+built with podman: same files, owners and modes.
+
 ## 10. Hub readiness (built later, designed for now)
 
 - Snippet ids are `namespace/name`. `core` is reserved for built-ins, and

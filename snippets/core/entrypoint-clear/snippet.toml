@@ -1,0 +1,23 @@
+id = "core/entrypoint-clear"
+version = "0.1.0"
+title = "Clear the image's ENTRYPOINT"
+category = "misc"
+summary = "ENTRYPOINT [] so CMD alone is the app, for images that set their own entrypoint."
+requires = ["category:base"]
+source = "~/mqtt.flk/Dockerfile, ~/enshrouded.flk/Dockerfile"
+
+[[dockerfile]]
+slot = "entry"
+text = '''
+# The base image has its own ENTRYPOINT; clear it so CMD is the app.
+ENTRYPOINT []'''
+
+[hints]
+what = "Adds ENTRYPOINT [] to the Dockerfile."
+under_the_hood = """
+flk's init runs ENTRYPOINT followed by CMD. An image's own entrypoint
+script (eclipse-mosquitto's, steamcmd's) would wrap or replace your
+command; clearing it makes CMD the whole command line.
+"""
+gotchas = ["Whatever the entrypoint script did (fixing ownership, writing config) is now yours to do: a start script or a prestart hook."]
+docs = ["flk help --all  (Machines)"]

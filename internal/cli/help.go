@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"text/tabwriter"
 )
 
 func usage(c *Command) string {
@@ -14,6 +15,9 @@ func usage(c *Command) string {
 	for _, o := range c.Opts {
 		if o.Arg != "" {
 			s += " [--" + o.Name + " " + o.Arg + "]"
+			if o.Multi {
+				s += "..."
+			}
 		} else {
 			s += " [--" + o.Name + "]"
 		}
@@ -25,15 +29,17 @@ func writeHelp(w io.Writer) {
 	fmt.Fprintln(w, "flkforge: forge a new flk app (Dockerfile, flk.toml, run wrapper) from snippets.")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Commands:")
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	for _, c := range commands {
 		name := c.Name
 		if c.Args != "" {
 			name += " " + c.Args
 		}
-		fmt.Fprintf(w, "  %-18s %s\n", name, c.Summary)
+		fmt.Fprintf(tw, "  %s\t%s\n", name, c.Summary)
 	}
+	tw.Flush()
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Without a terminal: flkforge new DIR --recipe FILE --yes")
+	fmt.Fprintln(w, "Start here: flkforge templates, then flkforge new DIR --template T --yes")
 	fmt.Fprintln(w, "More: flkforge help COMMAND, flkforge help --all [--json]")
 }
 

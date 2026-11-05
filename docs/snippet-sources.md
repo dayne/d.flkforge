@@ -101,6 +101,9 @@ step; never a value), `kill-timeout`.
 | `dev-sandbox` | base-ubuntu, user-rename, idle-cmd, rootfs-extra; options: `home-volume`, `sshd`. Tools from system packages or pinned downloads, not `curl \| bash` into `~`, so `flk deploy` upgrades them and a home volume doesn't hide them | opencode.flk |
 | `blank` | a base only | |
 
+Built so far (M2): `blank`, `web-service` (with check-tcp until flk's
+http checks reach main), `daemon`, `steam-game`. The rest come in M3.
+
 The "Check it reproduces" column is the acceptance test (PLAN M1): a
 recipe for each real app must render a flk.toml whose
 `flk config show --json` `parsed` and `machine_config` equal the real

@@ -2,42 +2,14 @@ package cli
 
 import (
 	"fmt"
-	"slices"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/dayne/d.flkforge/internal/forge"
 	"github.com/dayne/d.flkforge/internal/recipe"
 	"github.com/dayne/d.flkforge/internal/render"
-	"github.com/dayne/d.flkforge/internal/snippet"
 )
-
-const agentForm = "flkforge new DIR --recipe FILE --yes"
-
-func cmdNew(c *ctx) int {
-	dir := c.arg(0, ".")
-	if !c.has("recipe") {
-		if !c.isTTY() {
-			return c.usageError("no terminal, and the wizard needs one. Without a terminal: " + agentForm)
-		}
-		return c.usageError("the wizard isn't built yet (PLAN M4). For now: " + agentForm)
-	}
-	if !c.has("yes") {
-		if !c.isTTY() {
-			return c.usageError("no terminal to confirm in: add --yes (" + agentForm + ")")
-		}
-		return c.usageError("the wizard, which would show the recipe before writing, isn't built yet: add --yes")
-	}
-	r, err := recipe.Read(c.opt("recipe"))
-	if err != nil {
-		return c.errorf("%v", err)
-	}
-	out, err := c.env().New(dir, r, forge.NewOpts{App: c.opt("app"), Force: c.has("force"), RenderOpts: forge.RenderOpts{AllowWarnings: c.has("allow-warnings")}})
-	if err != nil {
-		return c.errorf("%v", err)
-	}
-	return c.report(out, false)
-}
 
 func cmdRender(c *ctx) int {
 	dir := c.arg(0, ".")
@@ -63,6 +35,11 @@ func next(out *forge.Outcome, rep forge.Report) string {
 			return fmt.Sprintf("cd %s && diff -u %s %s.flkforge-new", out.Dir, d[0].Path, d[0].Path)
 		}
 		return ""
+	}
+	for _, s := range rep.NotInEffect {
+		if s.UntilEdited != "" {
+			return "edit " + filepath.Join(out.Dir, s.UntilEdited) + " (" + s.Why + ")"
+		}
 	}
 	if len(rep.Run) > 0 {
 		return "cd " + out.Dir + " && " + rep.Run[0].Text
@@ -212,70 +189,4 @@ func cmdCheck(c *ctx) int {
 	}
 	fmt.Fprintln(c.out)
 	return code
-}
-
-type paramJSON struct {
-	Name     string   `json:"name"`
-	Type     string   `json:"type"`
-	Default  any      `json:"default,omitempty"`
-	Required bool     `json:"required"`
-	Values   []string `json:"values,omitempty"`
-	Prompt   string   `json:"prompt"`
-	Hint     string   `json:"hint,omitempty"`
-}
-
-type snippetJSON struct {
-	ID       string      `json:"id"`
-	Version  string      `json:"version"`
-	Title    string      `json:"title"`
-	Category string      `json:"category"`
-	Summary  string      `json:"summary"`
-	Multi    bool        `json:"multi"`
-	Requires []string    `json:"requires,omitempty"`
-	Origin   string      `json:"origin"`
-	Params   []paramJSON `json:"params"`
-}
-
-func cmdSnippets(c *ctx) int {
-	dir := c.opt("dir")
-	if dir == "" {
-		dir = "."
-	}
-	cat, err := c.env().Catalog(dir)
-	if err != nil {
-		return c.errorf("%v", err)
-	}
-	want := c.opt("category")
-	if want != "" && !slices.Contains(snippet.Categories, want) {
-		return c.usageError(fmt.Sprintf("category %q isn't one of %s", want, strings.Join(snippet.Categories, ", ")))
-	}
-	var list []*snippet.Snippet
-	for _, s := range cat.All() {
-		if want == "" || s.Category == want {
-			list = append(list, s)
-		}
-	}
-	slices.SortStableFunc(list, func(a, b *snippet.Snippet) int {
-		return slices.Index(snippet.Categories, a.Category) - slices.Index(snippet.Categories, b.Category)
-	})
-	if c.has("json") {
-		out := []snippetJSON{}
-		for _, s := range list {
-			j := snippetJSON{ID: s.ID, Version: s.Version, Title: s.Title, Category: s.Category, Summary: s.Summary, Multi: s.Multi, Requires: s.Requires, Origin: s.Origin, Params: []paramJSON{}}
-			for _, n := range s.ParamOrder {
-				p := s.Params[n]
-				j.Params = append(j.Params, paramJSON{n, p.Type, p.Default, p.Required, p.Values, p.Prompt, p.Hint})
-			}
-			out = append(out, j)
-		}
-		c.printJSON(out)
-		return exitOK
-	}
-	tw := tabwriter.NewWriter(c.out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "ID\tCATEGORY\tSUMMARY")
-	for _, s := range list {
-		fmt.Fprintf(tw, "%s\t%s\t%s\n", s.ID, s.Category, s.Summary)
-	}
-	tw.Flush()
-	return exitOK
 }

@@ -12,18 +12,20 @@ you pick in a wizard, and it explains each one as you go: which lines it
 adds, what flk does with them at build, boot, stop and backup time, and
 what to watch out for.
 
-    flkforge new myserver          # the wizard: pick snippets, see the files build up
-    flkforge edit                  # reopen this directory's recipe and remix it
+    flkforge templates             # starting points: daemon, steam-game, web-service, blank
+    flkforge new myserver --template daemon --yes --set service.port=6390 ...
+    flkforge add secret --set name=API_TOKEN     # remix: add, set, rm a snippet, then render
     flkforge render                # rewrite the files from flkforge.toml
-    flkforge check                 # recipe, files and flk agree; flk config show is clean
-    flkforge snippets              # the catalog (--json)
-    flkforge explain steamcmd      # what a snippet does under the hood
+    flkforge check                 # recipe, files and flk agree; ports, secrets, deploy state
+    flkforge snippets [show ID]    # the catalog (--json)
+    flkforge explain run-wrapper   # a snippet, a rule, a flk.toml key, or an ask that isn't a snippet (gpu)
 
 What it writes in the app directory:
 
 - `Dockerfile` and `flk.toml`: plain, commented files like the hand-written
   ones. They belong to you, and nothing at runtime depends on flkforge.
-- a run wrapper (`app-run`) when a snippet needs one.
+- `flk-run`, the run engine, when the app needs supervising (a clean stop,
+  restarts, events), and stub hooks for what is specific to your app.
 - `flkforge.toml`: the **recipe**, the snippets and settings you chose,
   so `flkforge edit` can pick up where you left off and a recipe can be
   shared.
@@ -35,10 +37,10 @@ commands to run next (`flk launch --no-deploy`, `flk volumes create ...`,
 Later: a **hub** of shared snippets and whole-app recipes
 (`flkforge hub search valheim`).
 
-Status: M0 (2026-11-04). `new --recipe FILE --yes`, `render`, `check`,
-`snippets`, `help` and `version` work, with the snippets for a small web
-app (`flkforge snippets`). The wizard, `edit`, `explain`, templates and the
-rest of the catalog are still to come: `PLAN.md`.
+Status: M2 (2026-11-04). The command line is complete for agents and
+scripts: templates, add/rm/set, check, explain, `--json` everywhere, and
+flk-run (the run engine). The wizard (`new` and `edit` in a terminal)
+and the rest of the catalog are still to come: `PLAN.md`.
 
     make install                   # ~/.local/bin/flkforge
     flkforge new ~/myapp.flk --recipe testdata/hello.toml --yes --app flkt-myapp

@@ -47,7 +47,10 @@ features without a terminal, through a recipe file and `--json`.
   its relations to other snippets (`requires`, `conflicts`, `suggests`).
 - **Template**: a starting set of snippets with defaults ("Steam game
   server", "Java server", "web service", "dev sandbox", "blank"). A
-  template is just a recipe stored in the catalog.
+  template is just a recipe stored in the catalog, at
+  `NAMESPACE/_templates/NAME.toml`, with a `title` and a `summary`. It may
+  leave params open (a port, a Steam app id): `new --template T` names
+  each one with the `--set USE.PARAM=VALUE` that fills it.
 - **Recipe**: `flkforge.toml` in the app directory: the app name, the
   chosen snippets and their parameter values, and a lock of the snippet
   versions and content hashes. It's what `edit`, `render` and `check` read,
@@ -164,9 +167,13 @@ strings, for `[env]`). Each param has `prompt`, `hint`, `default`,
 list), `validate` (a regex for strings and list items) and `min`/`max`
 (ints).
 
-A base snippet has a `[base]` table: `image` (a template; always a full
-name), `family` (apt, apk, dnf), `user` (the image's uid-1000 user, if
-any), `clear_entrypoint`, and `busybox` (no setpriv: rule 6.4).
+A base snippet has a `[base]` table: `image` (always a full name),
+`family` (apt, apk, dnf), `user` (the image's uid-1000 user, if any),
+`clear_entrypoint`, `busybox` (no util-linux setpriv: rule 6.4) and
+`no_shell` (no /bin/sh: rule 6.4). Each is a template or, for the flags,
+true/false, so `core/base-image` takes them all from params.
+
+Asks that aren't snippets live in `NAMESPACE/_limits.toml` (section 8.1).
 
 ## 5. Recipe format (`flkforge.toml`)
 
@@ -203,7 +210,12 @@ flkforge = "0.1.0"             # v1: every snippet is built in, so the binary's 
 [render]                       # written by render: hashes of the files it wrote (drift detection)
 Dockerfile = "sha256:..."
 "flk.toml" = "sha256:..."
+
+[seeded]                       # written by render: what each seed file's snippet writes now
+"start.sh" = "sha256:..."      # (so render can say the recipe's version moved past yours)
 ```
+
+Optional `title` and `summary` describe a template or a shared recipe.
 
 ## 6. Rendering
 
@@ -285,7 +297,12 @@ render; `warn` and `hint` don't) and a fix. Built so far:
 `image-full-name`, `kill-timeout-max`, `kill-timeout-margin`,
 `wrapper-restart`, `before-deploy-check`, `udp-only-check`,
 `log-check-dollar` (BUGS.flk.md #2), `busybox-user`, `stdin-null-console`;
-`app-name-taken` comes from the host (`internal/forge`). The first set comes from the
+`app-name-taken` comes from the host (`internal/forge`). M2 added
+`no-shell`, `live-backup-console`, `mount-owner`, `mount-hides`,
+`secret-in-env`, `private-key`, `guest-init` and `huge-pages`, and made
+the rules a catalog (`render.Rules`: id, level, summary, why) that
+`flkforge explain RULE` shows. Still to come with their snippets (M3):
+the JVM heap inside `[[vm]] memory`. The first set comes from the
 real apps' history:
 
 - `kill_timeout` must be above the wrapper's `STOP_TIMEOUT` with some
@@ -412,9 +429,13 @@ first broken link in each chain:
    the recipe is identical.
 4. flk: `flk config show --json` in DIR gives no `warnings`, and its
    `machine_config` agrees with the recipe (ports, mounts, checks).
-5. host hints (warn only): the app name is already registered
-   (`flk apps list --json`), a host port is already taken (`flk ports`),
-   a volume for each mount exists or needs creating.
+5. host: each forwarded host port is at or above flk's `min_port` and
+   not forwarded by another app (`flk ports --json`: FAIL); the app name
+   is registered from this directory (FAIL if from another one); its
+   release and machines (`flk status --json`), and whether flk.toml
+   changed since that release (its config against `machine_config`);
+   each secret the recipe names is set (`flk secrets list --json`);
+   each volume exists.
 
 `render` runs steps 2 to 4 itself, and fails on a flk warning unless
 `--allow-warnings` is given.
@@ -502,8 +523,11 @@ with its group, why, and the nearest alternative. Starting entries:
 - A shell in the VM: flk already does it (`flk ssh console`,
   `flk exec`). sshd is a snippet only for real SSH clients.
 
-Before adding an entry, check `flk help --all` and `~/flk/PLAN.md`,
-because flk changes. The `version` and `schema` from
+Built in M2 as `snippets/core/_limits.toml` (host-folder, lan-address,
+gpu, low-port, shell, systemd, docker-in-vm), each with a group: `flk`
+(flk does it), `root`, `flk-change` or `impossible`; `flkforge explain
+ID` shows one. Before adding an entry, check `flk help --all` and
+`~/flk/PLAN.md`, because flk changes. The `version` and `schema` from
 `flk help --all --json` say which flk the entry was checked against.
 
 Keys follow lazyflk where they overlap (`?` help, `q`/`esc`, tab). `h`
@@ -519,16 +543,24 @@ Works at 80 columns: the preview drops below the form when narrow.
     flkforge check [DIR] [--json]
     flkforge add SNIPPET [--id ID] [--set K=V ...] [DIR]      add to a recipe, then render
     flkforge rm ID [DIR]
-    flkforge set ID K=V ... [DIR]
+    flkforge set ID K=V ... [--unset K]... [DIR]
     flkforge snippets [list] [--category C] [--dir DIR] [--json]
     flkforge snippets show ID [--json]
     flkforge templates [--json]
-    flkforge explain SNIPPET|RULE|KEY        hints in full; KEY = a flk.toml key such as kill_timeout
+    flkforge explain SNIPPET|RULE|LIMIT|KEY  hints in full; KEY = a flk.toml key such as kill_timeout
+                                             (flk's own reference for it, read live from flk help --all)
     flkforge help [COMMAND] | help --all [--json]
     flkforge version
 
-Built so far (M0): `new` (with `--recipe`), `render`, `check`,
-`snippets` (list), `help`, `version`. `help --all --json` carries a
+Built so far (M2): `new` (`--template` or `--recipe`, `--set
+USE.PARAM=VALUE`), `render`, `check`, `add`, `rm`, `set` (with
+`--unset`), `snippets [list]`, `snippets show`, `templates`, `explain`,
+`help`, `version`; `edit` comes with the wizard (M4). Values on the
+command line are read by the param's type (numbers, true/false, lists as
+`a,b` or a TOML array, tables as TOML inline tables), so `version=3.20`
+stays a string. A failed edit changes neither the recipe nor any file;
+param errors list every open param at once with the command that fixes
+each. `help --all --json` carries a
 `schema` number (1), like flk's.
 
 `new --recipe FILE --yes` builds a whole app without a terminal (the
@@ -585,3 +617,8 @@ recipe's `[[vm]]` gives; fly.io deployment.
   and the races it fixes; no separate gamebus-events snippet; `user`,
   list `values` and `until_edited` in the snippet format (4); the rules
   implemented so far (6.4).
+- 2026-11-04 (M2): templates in `_templates/` with open params and
+  `--set` (3); templated base facts and `no_shell` (4); `[seeded]` (5);
+  the rules catalog and eight more rules (6.4); check's ports, deployed
+  state and secrets (7); the limits catalog (8.1); add/rm/set,
+  snippets show, templates, explain (9).

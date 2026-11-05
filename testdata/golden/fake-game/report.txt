@@ -18,4 +18,4 @@ For you to run, in DIR:
   flk volumes create world --size 1  # [[mounts]] needs the volume before the first deploy (one per machine)
   flk deploy                         # builds the image and starts the app; it waits for the health checks
 
-Next: cd DIR && flk launch --no-deploy
+Next: edit DIR/flk-run.d/prestart (fill it in (checks, config from the environment) before the first deploy, or drop it from hooks)

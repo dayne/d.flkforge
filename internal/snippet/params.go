@@ -176,11 +176,11 @@ func show(v any) string {
 // in defaults. Every param is in the result; one with no value and no
 // default is nil.
 func (s *Snippet) Resolve(values map[string]any) (map[string]any, error) {
-	var errs []string
+	var errs ParamErrors
 	out := map[string]any{}
 	for _, k := range sortedKeys(values) {
 		if _, ok := s.Params[k]; !ok {
-			errs = append(errs, fmt.Sprintf("%s: no such param (%s has: %s)", k, s.ID, strings.Join(s.ParamOrder, ", ")))
+			errs = append(errs, ParamProblem{Param: k, Msg: fmt.Sprintf("no such param (%s has: %s)", s.ID, strings.Join(s.ParamOrder, ", "))})
 		}
 	}
 	for _, name := range s.ParamOrder {
@@ -191,22 +191,40 @@ func (s *Snippet) Resolve(values map[string]any) (map[string]any, error) {
 		}
 		if v == nil {
 			if p.Required {
-				errs = append(errs, fmt.Sprintf("%s is required: %s", name, p.Prompt))
+				errs = append(errs, ParamProblem{Param: name, Missing: true, Msg: "required: " + p.Prompt})
 			}
 			out[name] = nil
 			continue
 		}
 		c, err := p.Coerce(v)
 		if err != nil {
-			errs = append(errs, fmt.Sprintf("%s: %v", name, err))
+			errs = append(errs, ParamProblem{Param: name, Msg: err.Error()})
 			continue
 		}
 		out[name] = c
 	}
 	if len(errs) > 0 {
-		return nil, fmt.Errorf("%s: %s", s.ID, strings.Join(errs, "; "))
+		return nil, errs
 	}
 	return out, nil
+}
+
+// ParamProblem is one param that doesn't fit.
+type ParamProblem struct {
+	Param   string
+	Missing bool // required, and not given
+	Msg     string
+}
+
+// ParamErrors are a use's param problems, all of them at once.
+type ParamErrors []ParamProblem
+
+func (e ParamErrors) Error() string {
+	var parts []string
+	for _, p := range e {
+		parts = append(parts, p.Param+": "+p.Msg)
+	}
+	return strings.Join(parts, "; ")
 }
 
 func sortedKeys[V any](m map[string]V) []string {

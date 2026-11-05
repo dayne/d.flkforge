@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -79,7 +80,7 @@ func (e *Env) Check(dir string) *CheckResult {
 	// 2. recipe
 	r, err := recipe.Read(dir)
 	if err != nil {
-		fix := "flkforge new " + dir + " --recipe FILE --yes starts one"
+		fix := "flkforge templates, then flkforge new " + dir + " --template T --yes starts one"
 		if !errors.Is(err, fs.ErrNotExist) {
 			fix = "fix " + filepath.Join(dir, recipe.File)
 		}
@@ -108,6 +109,11 @@ func (e *Env) Check(dir string) *CheckResult {
 
 	// 3. files
 	filesOK := true
+	for _, s := range editedSteps(dir, res, res.Steps) {
+		if s.UntilEdited != "" {
+			c.add("files", "warn", s.Text, "edit "+filepath.Join(dir, s.UntilEdited)+": "+s.Why)
+		}
+	}
 	for _, f := range res.Files {
 		disk, err := os.ReadFile(filepath.Join(dir, f.Path))
 		switch {
@@ -130,8 +136,10 @@ func (e *Env) Check(dir string) *CheckResult {
 	}
 
 	// 4. flk
+	var cfg *flk.Config
 	if e.Flk != nil && filesOK {
-		cfg, err := e.Flk.ConfigShow(dir, "")
+		var err error
+		cfg, err = e.Flk.ConfigShow(dir, "")
 		switch {
 		case err != nil:
 			c.add("flk", "FAIL", "flk config show: "+err.Error(), "fix flk.toml (in the recipe), then flkforge render")
@@ -144,9 +152,12 @@ func (e *Env) Check(dir string) *CheckResult {
 		}
 	}
 
-	// 5. host hints (warn only)
+	// 5. host: ports, then what's registered and deployed
 	if help == nil {
 		return c
+	}
+	if cfg != nil {
+		e.checkPorts(c, r.App, cfg)
 	}
 	reg, path, err := e.Registered(r.App)
 	abs, _ := filepath.Abs(filepath.Join(dir, "flk.toml"))
@@ -159,6 +170,8 @@ func (e *Env) Check(dir string) *CheckResult {
 		c.add("host", "FAIL", r.App+" is already registered, from "+path, "pick another app name (set app in the recipe, then flkforge render)")
 	default:
 		c.add("host", "ok", r.App+" is registered", "")
+		e.checkDeployed(c, dir, r.App, cfg)
+		e.checkSecrets(c, dir, r.App, res.Steps)
 		vols, err := e.Flk.Volumes(r.App)
 		if err != nil {
 			c.add("host", "warn", "flk volumes list: "+err.Error(), "")
@@ -192,9 +205,11 @@ func (c *CheckResult) next() string {
 			return l.Fix
 		}
 	}
-	for _, l := range c.Lines {
-		if l.Status == "warn" && l.Fix != "" && l.Group == "host" {
-			return l.Fix
+	for _, g := range []string{"files", "host"} {
+		for _, l := range c.Lines {
+			if l.Status == "warn" && l.Fix != "" && l.Group == g {
+				return l.Fix
+			}
 		}
 	}
 	if c.Fail == 0 {
@@ -206,4 +221,121 @@ func (c *CheckResult) next() string {
 		return "cd " + c.Dir + " && flk deploy"
 	}
 	return ""
+}
+
+// checkPorts: each host port the app forwards is allowed (flk's min_port)
+// and not already forwarded by another app.
+func (e *Env) checkPorts(c *CheckResult, app string, cfg *flk.Config) {
+	ports, err := e.Flk.Ports()
+	if err != nil {
+		c.add("host", "warn", "flk ports: "+err.Error(), "")
+		return
+	}
+	type hp struct {
+		proto string
+		port  int
+	}
+	var want []hp
+	if services, ok := cfg.Parsed["services"].([]any); ok {
+		for _, s := range services {
+			sm, _ := s.(map[string]any)
+			proto, _ := sm["protocol"].(string)
+			if proto == "" {
+				proto = "tcp"
+			}
+			pl, _ := sm["ports"].([]any)
+			for _, p := range pl {
+				pm, _ := p.(map[string]any)
+				if n, ok := pm["port"].(float64); ok {
+					want = append(want, hp{proto, int(n)})
+				}
+			}
+		}
+	}
+	if f, ok := cfg.Parsed["flk"].(map[string]any); ok {
+		if n, ok := f["http_port"].(float64); ok {
+			want = append(want, hp{"tcp", int(n)})
+		}
+	}
+	for _, w := range want {
+		name := fmt.Sprintf("%s/%d", w.proto, w.port)
+		if ports.MinPort > 0 && w.port < ports.MinPort {
+			c.add("host", "FAIL", fmt.Sprintf("host port %s is below flk's minimum (%d): flk won't forward it", name, ports.MinPort),
+				fmt.Sprintf("as root: sudo FLK_MIN_PORT=%d ~/flk/setup-host.sh, or pick a port of %d and up", w.port, ports.MinPort))
+			continue
+		}
+		taken := ""
+		for _, a := range ports.Active {
+			if a.Proto == w.proto && a.Port == w.port && a.App != app {
+				taken = a.App
+			}
+		}
+		if taken != "" {
+			c.add("host", "FAIL", "host port "+name+" is already forwarded to "+taken, "pick another host port (core/service host_port)")
+		} else {
+			c.add("host", "ok", "host port "+name+" is free", "")
+		}
+	}
+}
+
+// checkDeployed: the app's release and machines, and whether flk.toml
+// changed since the release was deployed.
+func (e *Env) checkDeployed(c *CheckResult, dir, app string, cfg *flk.Config) {
+	st, err := e.Flk.Status(app)
+	if err != nil {
+		c.add("host", "warn", "flk status: "+err.Error(), "")
+		return
+	}
+	rel := st.App.Release
+	if rel == nil {
+		c.add("host", "warn", app+" isn't deployed yet", "cd "+dir+" && flk deploy")
+		return
+	}
+	running := 0
+	for _, m := range st.Machines {
+		if m.State == "started" {
+			running++
+		}
+	}
+	c.add("host", "ok", fmt.Sprintf("release v%d deployed; %d of %d machines started", rel.Version, running, len(st.Machines)), "")
+	if cfg != nil && rel.Config != nil && !reflect.DeepEqual(normalize(rel.Config), normalize(cfg.MachineConfig)) {
+		c.add("host", "warn", fmt.Sprintf("flk.toml has changed since v%d was deployed (the Dockerfile may have too)", rel.Version), "cd "+dir+" && flk deploy")
+	}
+}
+
+// normalize drops keys whose value is null, so an older release's config
+// (without a newer flk's fields) compares equal when nothing changed.
+func normalize(m map[string]any) map[string]any {
+	out := map[string]any{}
+	for k, v := range m {
+		if v != nil {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+// checkSecrets: every secret the recipe names is set.
+func (e *Env) checkSecrets(c *CheckResult, dir, app string, steps []render.Step) {
+	var names []string
+	for _, s := range steps {
+		if rest, ok := strings.CutPrefix(s.Text, "flk secrets set "); ok {
+			names = append(names, strings.SplitN(rest, "=", 2)[0])
+		}
+	}
+	if len(names) == 0 {
+		return
+	}
+	set, err := e.Flk.Secrets(app)
+	if err != nil {
+		c.add("host", "warn", "flk secrets list: "+err.Error(), "")
+		return
+	}
+	for _, n := range names {
+		if slices.Contains(set, n) {
+			c.add("host", "ok", "secret "+n+" is set", "")
+		} else {
+			c.add("host", "warn", "secret "+n+" isn't set: the app won't have it", "cd "+dir+" && flk secrets set "+n+"=- --stage")
+		}
+	}
 }

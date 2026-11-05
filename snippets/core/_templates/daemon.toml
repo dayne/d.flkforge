@@ -1,0 +1,30 @@
+title = "Daemon"
+summary = "A long-running service from distro packages (a broker, a cache): always restarted, paused for backups, a TCP port."
+
+[[use]]
+  snippet = "core/base-alpine"
+
+[[use]]
+  snippet = "core/packages"
+
+[[use]]
+  snippet = "core/start-script"
+
+[[use]]
+  snippet = "core/service"
+
+[[use]]
+  snippet = "core/check-tcp"
+
+[[use]]
+  snippet = "core/volume"
+
+[[use]]
+  snippet = "core/restart-always"
+
+[[use]]
+  snippet = "core/backup-pause"
+
+[[use]]
+  snippet = "core/vm"
+  params = { cpus = 1, memory = "256mb" }

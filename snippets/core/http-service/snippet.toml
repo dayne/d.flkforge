@@ -35,6 +35,12 @@ when = "{{if not .P.host_port}}true{{end}}"
 text = "Port {{.P.port}} is on the machine's IP only (flk status shows it), not on a host port"
 why = "set host_port to forward one"
 
+[[next]]
+kind = "root"
+when = '{{if .P.host_port}}{{if lt .P.host_port 1024}}true{{end}}{{end}}'
+text = "sudo FLK_MIN_PORT={{.P.host_port}} ~/flk/setup-host.sh"
+why = "flk refuses host ports below 1024 until the host allows them"
+
 [hints]
 what = "Declares the app's HTTP port in [http_service]."
 under_the_hood = """

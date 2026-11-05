@@ -1,5 +1,5 @@
 # Written by flkforge. Change it with flkforge's commands or by hand, then
-# run `flkforge render`. The [lock] and [render] tables are flkforge's.
+# run `flkforge render`. The [lock], [render] and [seeded] tables are flkforge's.
 flkforge = "0.1.0"
 app = "fake-game"
 
@@ -118,3 +118,7 @@ done
   Dockerfile = "sha256:04406e0dd4cb7aca0151fbf994f512c5c359ecb7131529a8f426576c5b2031b4"
   flk-run = "sha256:e55500f790937a9d7ad044595a48809c042c9fe58c708c5d99216f28e190051c"
   "flk.toml" = "sha256:b7fdec42b90dc870e5bbc7789f3fdb149b877a80fd4161787950fcb43e157a97"
+
+[seeded]
+  fakeserver = "sha256:fc49efe4187d21ffcab3c821709ac406ffb849a183dfcfe26b3d75a23f182832"
+  "flk-run.d/prestart" = "sha256:7b40bf19d7f96a5171eee3e54bd00225aed96524d73e33ab92bc2cc0620b7777"

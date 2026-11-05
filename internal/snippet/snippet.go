@@ -62,16 +62,22 @@ type Snippet struct {
 func (s *Snippet) Name() string { return path.Base(s.ID) }
 
 // Base is what a base snippet tells the others about its image.
+//
+// Every field is a template, so a generic base (core/base-image) can take
+// them from params; the flags are true/false or a template giving one.
 type Base struct {
-	Image string `toml:"image"` // a template, full name: docker.io/library/alpine:{{.P.version}}
+	Image string `toml:"image"` // full name: docker.io/library/alpine:{{.P.version}}
 	// Family is the package manager: apt, apk or dnf.
 	Family string `toml:"family"`
 	// User is the image's uid-1000 user, if it has one (ubuntu).
 	User string `toml:"user"`
 	// ClearEntrypoint: the image sets an ENTRYPOINT that must be cleared.
-	ClearEntrypoint bool `toml:"clear_entrypoint"`
-	// Busybox: no setpriv or chroot --userspec, so a non-root USER needs a package (SPEC 6.4).
-	Busybox bool `toml:"busybox"`
+	ClearEntrypoint any `toml:"clear_entrypoint"`
+	// Busybox: no util-linux setpriv, so a non-root USER needs a package (SPEC 6.4).
+	Busybox any `toml:"busybox"`
+	// NoShell: no /bin/sh (scratch, distroless): flk boots it with its
+	// static agent init, which needs Go on the host (SPEC 6.4).
+	NoShell any `toml:"no_shell"`
 }
 
 // DockerFragment adds lines to one slot of the Dockerfile.
@@ -183,8 +189,19 @@ func (s *Snippet) validate() error {
 		if s.Base.Image == "" {
 			return fmt.Errorf("%s: [base] needs an image", s.ID)
 		}
-		if !slices.Contains([]string{"apt", "apk", "dnf"}, s.Base.Family) {
+		if !strings.Contains(s.Base.Family, "{{") && !slices.Contains([]string{"apt", "apk", "dnf"}, s.Base.Family) {
 			return fmt.Errorf("%s: [base] family must be apt, apk or dnf", s.ID)
+		}
+		for name, v := range map[string]any{"clear_entrypoint": s.Base.ClearEntrypoint, "busybox": s.Base.Busybox, "no_shell": s.Base.NoShell} {
+			switch x := v.(type) {
+			case nil, bool:
+			case string:
+				if !strings.Contains(x, "{{") {
+					return fmt.Errorf("%s: [base] %s: true, false or a template", s.ID, name)
+				}
+			default:
+				return fmt.Errorf("%s: [base] %s: true, false or a template", s.ID, name)
+			}
 		}
 	}
 	for _, name := range s.ParamOrder {

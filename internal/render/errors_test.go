@@ -16,7 +16,7 @@ func TestRenderRefuses(t *testing.T) {
 		"unknown":        {base + "[[use]]\nsnippet = \"nope\"\n", "no snippet \"nope\""},
 		"bad param":      {base + "[[use]]\nsnippet = \"volume\"\nparams = { size = \"big\" }\n", "size: want a whole number"},
 		"unknown param":  {base + "[[use]]\nsnippet = \"volume\"\nparams = { sise = 2 }\n", "sise: no such param"},
-		"required":       {base + "[[use]]\nsnippet = \"packages\"\n", "list is required"},
+		"required":       {base + "[[use]]\nsnippet = \"packages\"\n", "list: required"},
 		"enum/validate":  {base + "[[use]]\nsnippet = \"volume\"\nparams = { name = \"My Data\" }\n", "doesn't match"},
 		"merge conflict": {base + "[[use]]\nsnippet = \"env\"\nid = \"a\"\nparams = { vars = { X = \"1\" } }\n[[use]]\nsnippet = \"env\"\nid = \"b\"\nparams = { vars = { X = \"2\" } }\n", "env.X is set twice"},
 		"needs base":     {"[[use]]\nsnippet = \"packages\"\nparams = { list = [\"x\"] }\n", "needs a snippet of category base"},

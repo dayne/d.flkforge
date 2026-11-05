@@ -1,0 +1,47 @@
+title = "Steam game server"
+summary = "A Linux dedicated server from Steam under flk-run, as uid 1000, UDP, a log check, pause backups and a backup before each deploy (like valheim-flk)."
+
+[[use]]
+  snippet = "core/base-ubuntu"
+
+[[use]]
+  snippet = "core/packages"
+  params = { list = ["ca-certificates", "tzdata"] }
+
+[[use]]
+  snippet = "core/steamcmd"
+
+[[use]]
+  snippet = "core/run-wrapper"
+  params = { stop = "signal:INT", stop_timeout = 90, hooks = ["prestart", "watch"] }
+
+[[use]]
+  snippet = "core/user-1000"
+  params = { workdir = "/server" }
+
+[[use]]
+  snippet = "core/volume"
+
+[[use]]
+  snippet = "core/service"
+  params = { protocol = "udp" }
+
+[[use]]
+  snippet = "core/check-log"
+  params = { grace = "5m" }
+
+[[use]]
+  snippet = "core/backup-pause"
+
+[[use]]
+  snippet = "core/before-deploy"
+
+[[use]]
+  snippet = "core/restart-outer-net"
+
+[[use]]
+  snippet = "core/stdin-null"
+
+[[use]]
+  snippet = "core/vm"
+  params = { cpus = 2, memory = "4gb" }

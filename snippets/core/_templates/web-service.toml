@@ -1,0 +1,23 @@
+title = "Web service"
+summary = "A small HTTP app on Alpine: a start script, the HTTP port, a health check and a data volume (like flk's examples/hello)."
+
+[[use]]
+  snippet = "core/base-alpine"
+
+[[use]]
+  snippet = "core/start-script"
+
+[[use]]
+  snippet = "core/http-service"
+  params = { port = 8080 }
+
+[[use]]
+  snippet = "core/check-tcp"
+  params = { port = 8080, grace = "30s" }
+
+[[use]]
+  snippet = "core/volume"
+
+[[use]]
+  snippet = "core/vm"
+  params = { cpus = 1, memory = "256mb" }

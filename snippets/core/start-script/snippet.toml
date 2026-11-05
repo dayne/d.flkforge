@@ -30,6 +30,8 @@ hint = "End with exec PROGRAM, so the program is the VM's main process and gets 
 default = '''
 #!/bin/sh
 # The app: set things up, then exec the program so it gets flk's SIGTERM.
+# It must stay in the foreground (no daemonizing: there's no systemd).
+# flkforge stub: replace the line below with your program.
 set -e
 echo "starting"
 exec sleep infinity
@@ -49,6 +51,13 @@ text = "COPY {{.P.file}} {{.P.dest}}"
 slot = "entry"
 when = "{{.P.cmd}}"
 text = 'CMD ["{{.P.dest}}"]'
+
+[[next]]
+kind = "pending"
+when = '{{contains .P.body "flkforge stub"}}'
+until_edited = "{{.P.file}}"
+text = "{{.P.file}} is a stub that runs sleep infinity"
+why = "make it exec your program in the foreground (no daemonizing) before the first deploy"
 
 [hints]
 what = "Copies a start script into the image and makes it the command the VM runs."

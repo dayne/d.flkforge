@@ -1,0 +1,62 @@
+id = "core/base-image"
+version = "0.1.0"
+title = "Any base image"
+category = "base"
+summary = "Start from any image (eclipse-mosquitto, postgres...): you say its package manager and user."
+source = "~/mqtt.flk/Dockerfile (eclipse-mosquitto)"
+
+[params.image]
+type = "string"
+required = true
+prompt = "The image, in full with a pinned tag (docker.io/library/eclipse-mosquitto:2.1.2-alpine)"
+hint = "Pin a tag: latest changes under you. Write the registry: podman here has no search registries."
+validate = '^[a-z0-9.:/_-]+(:[A-Za-z0-9._-]+)?(@sha256:[0-9a-f]{64})?$'
+
+[params.family]
+type = "enum"
+values = ["apt", "apk", "dnf"]
+required = true
+prompt = "Its package manager: apt (Debian, Ubuntu), apk (Alpine) or dnf (Fedora)"
+
+[params.user]
+type = "string"
+prompt = "Its uid-1000 user, if it has one (ubuntu-based images: ubuntu)"
+validate = '^[a-z_][a-z0-9_-]*$'
+
+[params.busybox]
+type = "bool"
+default = false
+prompt = "Busybox-based (Alpine): no util-linux setpriv"
+
+[params.shell]
+type = "bool"
+default = true
+prompt = "Has /bin/sh (false for scratch and distroless images)"
+
+[params.clear_entrypoint]
+type = "bool"
+default = false
+prompt = "Clear its ENTRYPOINT, so CMD is the app (eclipse-mosquitto needs it)"
+
+[base]
+image = "{{.P.image}}"
+family = "{{.P.family}}"
+user = '{{if .P.user}}{{.P.user}}{{end}}'
+busybox = "{{.P.busybox}}"
+no_shell = "{{not .P.shell}}"
+clear_entrypoint = "{{.P.clear_entrypoint}}"
+
+[hints]
+what = "Starts the image from an image you name, and records what flkforge needs to know about it."
+under_the_hood = """
+flk deploy builds FROM this image and turns the result into the VM's root
+filesystem; the image's ENTRYPOINT/CMD becomes the one app flk's init
+runs. Images built for containers often have an ENTRYPOINT script that
+expects a container runtime: clear it and set CMD yourself if it gets in
+the way.
+"""
+gotchas = [
+  "Container entrypoints that call gosu/su-exec, or expect a writable /run they create, may need clearing.",
+  "Find the family with: podman run --rm IMAGE cat /etc/os-release.",
+]
+docs = ["flk help --all  (Config: [build]; Machines)", "flk help first-app"]

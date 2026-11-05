@@ -164,3 +164,80 @@ func (c *Client) Volumes(app string) ([]Volume, error) {
 	}
 	return vols, nil
 }
+
+// HelpAllText is `flk help --all`: the full reference, as text.
+func (c *Client) HelpAllText() (string, error) {
+	out, err := c.run("", "help", "--all")
+	return string(out), err
+}
+
+// Status is the part of `flk status --json -a APP` flkforge reads.
+type Status struct {
+	App struct {
+		Release *struct {
+			Version int            `json:"version"`
+			Config  map[string]any `json:"config"`
+		} `json:"release"`
+	} `json:"app"`
+	Machines []struct {
+		ID      string `json:"id"`
+		Name    string `json:"name"`
+		State   string `json:"state"`
+		Release int    `json:"release"`
+	} `json:"machines"`
+}
+
+// Status reads a registered app's release and machines.
+func (c *Client) Status(app string) (*Status, error) {
+	out, err := c.run("", "status", "--json", "-a", app)
+	if err != nil {
+		return nil, err
+	}
+	var s Status
+	if err := json.Unmarshal(out, &s); err != nil {
+		return nil, fmt.Errorf("flk status --json: %v", err)
+	}
+	return &s, nil
+}
+
+// Secrets lists a registered app's secret names (never values).
+func (c *Client) Secrets(app string) ([]string, error) {
+	out, err := c.run("", "secrets", "list", "--json", "-a", app)
+	if err != nil {
+		return nil, err
+	}
+	var list []struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(out, &list); err != nil {
+		return nil, fmt.Errorf("flk secrets list --json: %v", err)
+	}
+	names := make([]string, len(list))
+	for i, s := range list {
+		names[i] = s.Name
+	}
+	return names, nil
+}
+
+// Ports is the part of `flk ports --json` flkforge reads.
+type Ports struct {
+	MinPort int `json:"min_port"`
+	Active  []struct {
+		Proto string `json:"proto"`
+		Port  int    `json:"port"`
+		App   string `json:"app"`
+	} `json:"active"`
+}
+
+// Ports reads the host's forwarded ports.
+func (c *Client) Ports() (*Ports, error) {
+	out, err := c.run("", "ports", "--json")
+	if err != nil {
+		return nil, err
+	}
+	var p Ports
+	if err := json.Unmarshal(out, &p); err != nil {
+		return nil, fmt.Errorf("flk ports --json: %v", err)
+	}
+	return &p, nil
+}

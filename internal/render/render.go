@@ -92,6 +92,8 @@ type App struct {
 	// User runs the app; empty: root.
 	User string
 	Uses []string // every use's key
+	// From the base: no util-linux setpriv; no /bin/sh; an ENTRYPOINT to clear.
+	Busybox, NoShell, ClearEntrypoint bool
 }
 
 // Data is what a template sees.
@@ -132,15 +134,13 @@ func Render(r *recipe.Recipe, cat Resolver) (*Result, error) {
 	if base == nil {
 		return nil, fmt.Errorf("no base snippet: add one (flkforge snippets --category base)")
 	}
-	app := App{Name: r.App, Family: base.s.Base.Family, BaseUser: base.s.Base.User}
+	app := App{Name: r.App}
 	for _, u := range uses {
 		app.Uses = append(app.Uses, u.key)
 	}
-	img, err := execute(base.s.ID+" [base] image", base.s.Base.Image, Data{P: base.p, ID: base.key, App: app})
-	if err != nil {
+	if err := resolveBase(base, &app); err != nil {
 		return nil, err
 	}
-	app.Image = strings.TrimSpace(img)
 	var userFrom string
 	for _, u := range uses {
 		if u.s.User == "" {
@@ -225,18 +225,23 @@ func Render(r *recipe.Recipe, cat Resolver) (*Result, error) {
 
 func resolve(r *recipe.Recipe, cat Resolver) ([]*use, error) {
 	var uses []*use
+	var perr ParamErrors
 	count := map[string]int{}
 	for _, ru := range r.Uses {
 		s, err := cat.Get(ru.Snippet)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("[[use]] %s: %w", ru.Key(), err)
 		}
 		p, err := s.Resolve(ru.Params)
 		if err != nil {
-			return nil, err
+			perr = append(perr, &ParamError{Use: ru.Key(), Snippet: s.ID, Err: err})
+			continue
 		}
 		count[s.ID]++
 		uses = append(uses, &use{Use: ru, key: ru.Key(), s: s, p: p})
+	}
+	if len(perr) > 0 {
+		return nil, perr
 	}
 	for _, u := range uses {
 		if count[u.s.ID] > 1 && !u.s.Multi {
@@ -336,7 +341,7 @@ func renderDockerfile(uses []*use, base *use, app App) (string, []string, error)
 	if len(pkgs) > 0 {
 		slots["packages"] = append([]string{install(app.Family, pkgs)}, slots["packages"]...)
 	}
-	if base.s.Base.ClearEntrypoint {
+	if app.ClearEntrypoint {
 		slots["entry"] = append([]string{"# The base image has its own ENTRYPOINT; clear it so CMD is the app.\nENTRYPOINT []"}, slots["entry"]...)
 	}
 
@@ -528,9 +533,10 @@ var funcs = template.FuncMap{
 		}
 		return fmt.Sprint(l)
 	},
-	"lower": strings.ToLower,
-	"upper": strings.ToUpper,
-	"has":   func(l []string, s string) bool { return slices.Contains(l, s) },
+	"lower":    strings.ToLower,
+	"upper":    strings.ToUpper,
+	"has":      func(l []string, s string) bool { return slices.Contains(l, s) },
+	"contains": func(s any, sub string) bool { str, _ := s.(string); return strings.Contains(str, sub) },
 	"default": func(def, v any) any {
 		if v == nil || v == "" {
 			return def
@@ -564,4 +570,77 @@ func toInt(v any) (int64, bool) {
 		return int64(n), true
 	}
 	return 0, false
+}
+
+// resolveBase evaluates the base snippet's facts (they may be templates).
+func resolveBase(base *use, app *App) error {
+	b := base.s.Base
+	d := Data{P: base.p, ID: base.key, App: *app}
+	str := func(what, t string) (string, error) {
+		out, err := execute(base.s.ID+" [base] "+what, t, d)
+		return strings.TrimSpace(out), err
+	}
+	flag := func(what string, v any) (bool, error) {
+		switch x := v.(type) {
+		case nil:
+			return false, nil
+		case bool:
+			return x, nil
+		case string:
+			out, err := str(what, x)
+			if err != nil {
+				return false, err
+			}
+			if out != "true" && out != "false" && out != "" {
+				return false, fmt.Errorf("%s: [base] %s gave %q, not true or false", base.s.ID, what, out)
+			}
+			return out == "true", nil
+		}
+		return false, fmt.Errorf("%s: [base] %s: true, false or a template", base.s.ID, what)
+	}
+	var err error
+	if app.Image, err = str("image", b.Image); err != nil {
+		return err
+	}
+	if app.Family, err = str("family", b.Family); err != nil {
+		return err
+	}
+	if !slices.Contains([]string{"apt", "apk", "dnf"}, app.Family) {
+		return fmt.Errorf("%s: family %q: apt, apk or dnf", base.key, app.Family)
+	}
+	if app.BaseUser, err = str("user", b.User); err != nil {
+		return err
+	}
+	if app.Busybox, err = flag("busybox", b.Busybox); err != nil {
+		return err
+	}
+	if app.NoShell, err = flag("no_shell", b.NoShell); err != nil {
+		return err
+	}
+	app.ClearEntrypoint, err = flag("clear_entrypoint", b.ClearEntrypoint)
+	return err
+}
+
+// ParamError is a use whose params don't fit its snippet: what to fix is
+// `flkforge set USE PARAM=VALUE`.
+type ParamError struct {
+	Use     string
+	Snippet string
+	Err     error // a snippet.ParamErrors
+}
+
+func (e *ParamError) Error() string {
+	return "[[use]] " + e.Use + " (" + e.Snippet + "): " + e.Err.Error()
+}
+func (e *ParamError) Unwrap() error { return e.Err }
+
+// ParamErrors are every use's param problems, all at once.
+type ParamErrors []*ParamError
+
+func (e ParamErrors) Error() string {
+	var parts []string
+	for _, p := range e {
+		parts = append(parts, p.Error())
+	}
+	return strings.Join(parts, "\n")
 }

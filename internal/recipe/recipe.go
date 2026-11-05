@@ -26,6 +26,8 @@ type Recipe struct {
 	Flkforge string `toml:"flkforge"` // the flkforge that wrote it
 	App      string `toml:"app"`
 	Template string `toml:"template"` // where it started (informational)
+	Title    string `toml:"title"`    // for templates and shared recipes
+	Summary  string `toml:"summary"`
 	Uses     []Use  `toml:"use"`
 	// Lock: while every snippet is built in, the flkforge version
 	// ("flkforge" key) is the lock. Snippets from other sources get an
@@ -34,6 +36,9 @@ type Recipe struct {
 	// Render: the sha256 of each managed file the last render wrote, by
 	// path (drift detection, SPEC 6.5).
 	Render map[string]string `toml:"render"`
+	// Seeded: for each seed file, the hash of what its snippet writes, as of
+	// the last render (to say when the recipe's version has changed).
+	Seeded map[string]string `toml:"seeded"`
 }
 
 // Use is one [[use]]: a snippet and its params.
@@ -125,15 +130,23 @@ func Read(path string) (*Recipe, error) {
 	return r, nil
 }
 
-const header = "# Written by flkforge. Change it with flkforge's commands or by hand, then\n# run `flkforge render`. The [lock] and [render] tables are flkforge's."
+const header = "# Written by flkforge. Change it with flkforge's commands or by hand, then\n# run `flkforge render`. The [lock], [render] and [seeded] tables are flkforge's."
 
 // Format writes the recipe as TOML.
 func (r *Recipe) Format() string {
 	root := &flktoml.Table{}
 	root.Items = append(root.Items, &flktoml.KV{Key: "flkforge", Value: flktoml.Quote(r.Flkforge), Comment: strings.Split(header, "\n")})
-	root.Set("app", flktoml.Quote(r.App))
+	if r.App != "" {
+		root.Set("app", flktoml.Quote(r.App))
+	}
 	if r.Template != "" {
 		root.Set("template", flktoml.Quote(r.Template))
+	}
+	if r.Title != "" {
+		root.Set("title", flktoml.Quote(r.Title))
+	}
+	if r.Summary != "" {
+		root.Set("summary", flktoml.Quote(r.Summary))
 	}
 	for _, u := range r.Uses {
 		t, _ := root.Append("use")
@@ -169,6 +182,12 @@ func (r *Recipe) Format() string {
 		t, _ := root.Sub("render", true)
 		for _, k := range sortedKeys(r.Render) {
 			t.Set(k, flktoml.Quote(r.Render[k]))
+		}
+	}
+	if len(r.Seeded) > 0 {
+		t, _ := root.Sub("seeded", true)
+		for _, k := range sortedKeys(r.Seeded) {
+			t.Set(k, flktoml.Quote(r.Seeded[k]))
 		}
 	}
 	return flktoml.Format(root, nil)

@@ -31,7 +31,8 @@ type Options struct {
 
 type ctx struct {
 	cmd    *Command
-	opts   map[string]string // option name -> value ("" for a switch that's set)
+	opts   map[string]string   // option name -> value ("" for a switch that's set)
+	multi  map[string][]string // values of Multi options, in order
 	pos    []string
 	out    io.Writer
 	errw   io.Writer
@@ -110,7 +111,7 @@ func Main(args []string, o Options) int {
 		fmt.Fprintf(o.Stderr, "Error: unknown command %q (flkforge help lists them)\n", args[0])
 		return exitUsage
 	}
-	c := &ctx{cmd: cmd, opts: map[string]string{}, out: o.Stdout, errw: o.Stderr, isTTY: o.IsTTY, envFn: o.Env}
+	c := &ctx{cmd: cmd, opts: map[string]string{}, multi: map[string][]string{}, out: o.Stdout, errw: o.Stderr, isTTY: o.IsTTY, envFn: o.Env}
 	if err := parse(c, args[1:]); err != nil {
 		if err == errHelp {
 			writeCommandHelp(o.Stdout, cmd)
@@ -149,7 +150,7 @@ func parse(c *ctx, args []string) error {
 		if o == nil || !strings.HasPrefix(a, "--") {
 			return fmt.Errorf("unknown option %s for %s", a, c.cmd.Name)
 		}
-		if _, dup := c.opts[name]; dup {
+		if _, dup := c.opts[name]; dup && !o.Multi {
 			return fmt.Errorf("--%s given twice", name)
 		}
 		switch {
@@ -163,6 +164,9 @@ func parse(c *ctx, args []string) error {
 			val = args[i]
 		}
 		c.opts[name] = val
+		if o.Multi {
+			c.multi[name] = append(c.multi[name], val)
+		}
 	}
 	min, max := arity(c.cmd.Args)
 	if len(c.pos) < min {
@@ -174,9 +178,16 @@ func parse(c *ctx, args []string) error {
 	return nil
 }
 
-// arity counts a usage string's positionals: NAME is required, [NAME] optional.
+// arity counts a usage string's positionals: NAME is required, [NAME]
+// optional, NAME... one or more, [NAME...] any number.
 func arity(args string) (min, max int) {
 	for _, f := range strings.Fields(args) {
+		if strings.HasSuffix(f, "...") || strings.HasSuffix(f, "...]") {
+			if !strings.HasPrefix(f, "[") {
+				min++
+			}
+			return min, 1 << 30
+		}
 		max++
 		if !strings.HasPrefix(f, "[") {
 			min++

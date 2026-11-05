@@ -8,6 +8,8 @@ type Opt struct {
 	Name string `json:"name"` // without the dashes
 	Arg  string `json:"arg,omitempty"`
 	Help string `json:"help"`
+	// Multi: may be given more than once (--set K=V --set K2=V2).
+	Multi bool `json:"multi,omitempty"`
 }
 
 // Command is one entry of the table.
@@ -22,6 +24,14 @@ type Command struct {
 }
 
 var jsonOpt = Opt{Name: "json", Help: "Print JSON instead of text"}
+
+// editOpts are the options of the commands that change a recipe and render.
+var editOpts = []Opt{
+	{Name: "force", Help: "Overwrite files that were changed by hand"},
+	{Name: "allow-warnings", Help: "Write even if flk config show warns about the new flk.toml"},
+	{Name: "dry-run", Help: "Show what would change; write nothing"},
+	jsonOpt,
+}
 
 // Exit codes (SPEC 9).
 const (
@@ -41,9 +51,11 @@ var commands []*Command
 func init() {
 	commands = []*Command{
 		{Name: "new", Args: "[DIR]", run: cmdNew, JSON: true,
-			Summary: "Start a new app in DIR (default .) from a recipe; the wizard comes later",
+			Summary: "Start a new app in DIR (default .) from a template or a recipe; the wizard comes later",
 			Opts: []Opt{
-				{Name: "recipe", Arg: "FILE", Help: "Build the app from this recipe (a flkforge.toml)"},
+				{Name: "template", Arg: "T", Help: "Start from this template (flkforge templates lists them)"},
+				{Name: "recipe", Arg: "FILE", Help: "Start from this recipe (a flkforge.toml)"},
+				{Name: "set", Arg: "USE.PARAM=VALUE", Multi: true, Help: "Set a param of one of the recipe's uses (a template leaves some open)"},
 				{Name: "app", Arg: "NAME", Help: "App name (default: the recipe's, else from DIR: foo.flk -> foo-flk)"},
 				{Name: "yes", Help: "Write without asking (needed without a terminal)"},
 				{Name: "force", Help: "DIR already has a Dockerfile or flk.toml: write next to them (they're never overwritten)"},
@@ -51,7 +63,8 @@ func init() {
 				jsonOpt,
 			},
 			Notes: []string{
-				"The agent path: flkforge new DIR --recipe FILE --yes [--app NAME] builds a whole app with no terminal.",
+				"The agent path: flkforge new DIR --template T --yes [--set USE.PARAM=VALUE ...] [--app NAME], or --recipe FILE instead of --template.",
+				"A use's id is its snippet's name (service, volume) unless the recipe gives it one. A template's open params are errors that name the --set to add.",
 				"Writes Dockerfile, flk.toml, any files the snippets add, and DIR/flkforge.toml (the recipe, with hashes of what it wrote).",
 				"Never deploys and never runs root steps: it ends with the flk commands to run.",
 			}},
@@ -75,14 +88,45 @@ func init() {
 				"Each line is ok, warn or FAIL, with a -> fix. Exit 1 on any FAIL.",
 				"Never changes anything: safe for agents and cron.",
 			}},
-		{Name: "snippets", run: cmdSnippets, JSON: true,
-			Summary: "List the snippets in the catalog",
+		{Name: "add", Args: "SNIPPET [DIR]", run: cmdAdd, JSON: true,
+			Summary: "Add a snippet to DIR's recipe, then render",
+			Opts: append([]Opt{
+				{Name: "id", Arg: "ID", Help: "The use's id (needed when the snippet is used more than once)"},
+				{Name: "set", Arg: "PARAM=VALUE", Multi: true, Help: "Set one of its params"},
+			}, editOpts...),
+			Notes: []string{
+				"Values are read by the param's type: numbers, true/false, lists as a,b or [\"a\", \"b\"], tables as { K = \"v\" }.",
+				"Nothing changes (recipe or files) unless the result renders and its files can be written.",
+			}},
+		{Name: "rm", Args: "USE [DIR]", run: cmdRm, JSON: true,
+			Summary: "Remove a use from DIR's recipe, then render",
+			Opts:    editOpts,
+			Notes:   []string{"A file only that use wrote is deleted if it's unchanged since the last render, and left with a note if you edited it."}},
+		{Name: "set", Args: "USE PARAM=VALUE... [DIR]", run: cmdSet, JSON: true,
+			Summary: "Set params of a use in DIR's recipe, then render",
+			Opts: append([]Opt{
+				{Name: "unset", Arg: "PARAM", Multi: true, Help: "Remove a param (back to its default)"},
+			}, editOpts...),
+			Notes: []string{"USE is the use's id: its snippet's name unless the recipe gives it one (flkforge.toml's [[use]] id)."}},
+		{Name: "snippets", Args: "[SUB] [ID]", run: cmdSnippets, JSON: true,
+			Summary: "List the snippets (snippets [list]), or show one's params (snippets show ID)",
 			Opts: []Opt{
 				{Name: "category", Arg: "C", Help: "Only this category"},
 				{Name: "dir", Arg: "DIR", Help: "Include DIR's own snippets (DIR/.flkforge/snippets; default .)"},
 				jsonOpt,
 			},
 			Notes: []string{"Built-in snippets, then ~/.config/flkforge/snippets, then the app's .flkforge/snippets; later ones override earlier ones by id."}},
+		{Name: "templates", run: cmdTemplates, JSON: true,
+			Summary: "List the templates: starting recipes for flkforge new --template",
+			Opts:    []Opt{{Name: "dir", Arg: "DIR", Help: "Include DIR's own (default .)"}, jsonOpt}},
+		{Name: "explain", Args: "WHAT", run: cmdExplain, JSON: true,
+			Summary: "Explain a snippet, a rule, an ask that isn't a snippet (host-folder, gpu...), or a flk.toml key",
+			Opts:    []Opt{{Name: "dir", Arg: "DIR", Help: "Include DIR's own snippets (default .)"}, jsonOpt},
+			Notes: []string{
+				"A snippet: what it does, under the hood, gotchas, where to read more.",
+				"A rule (kill-timeout-margin...): what it checks and why. A key (kill_timeout, flk.backup): flk's own reference for it, read from flk help --all, and the snippets that set it.",
+				"Asks that aren't snippets: " + "host-folder, lan-address, gpu, low-port, shell, systemd, docker-in-vm.",
+			}},
 		{Name: "help", Args: "[COMMAND]", run: cmdHelp, JSON: true,
 			Summary: "Show help for flkforge or a command",
 			Opts: []Opt{

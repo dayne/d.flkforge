@@ -1,0 +1,5 @@
+title = "Blank"
+summary = "A base image and nothing else: add snippets with flkforge add."
+
+[[use]]
+  snippet = "core/base-ubuntu"

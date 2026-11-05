@@ -19,6 +19,11 @@ prompt = "vCPUs"
 type = "size"
 prompt = "Memory, such as 256mb or 6gb"
 
+[params.huge_pages]
+type = "bool"
+default = false
+prompt = "Take the memory from the host's huge pages (2 MB pages; a root step on the host)"
+
 [[flktoml]]
 when = "{{if or .P.size .P.cpus .P.memory}}true{{end}}"
 text = '''
@@ -29,6 +34,8 @@ text = '''
   cpus = {{.P.cpus}}{{end}}
 {{- if .P.memory}}
   memory = {{toml .P.memory}}{{end}}
+{{- if .P.huge_pages}}
+  huge_pages = "2M"  # from the host's hugetlbfs pool{{end}}
 '''
 
 [hints]

@@ -1,0 +1,57 @@
+# Asks that aren't snippets (SPEC 8.1): what flkforge says instead of
+# writing files that look right and do nothing. Each entry has a group:
+#   flk      flk does it already (no snippet needed)
+#   root     a root step on the host (shown, never run)
+#   flk-change  needs a change in flk
+#   impossible  not possible on Firecracker
+# Checked against flk 0.1.0 (help schema 1), ~/flk at f7f9b4a, 2026-11-04.
+# Check `flk help --all` and ~/flk/PLAN.md before changing an entry.
+
+[[limit]]
+id = "host-folder"
+ask = "Share a folder from the host with the VM"
+group = "impossible"
+why = "Firecracker has no virtiofs or 9p: a VM can't mount a host directory."
+instead = "Copy it in: flk volumes create NAME --from-dir DIR, or flk files cp; reach it over the network (sshfs, NFS from the host); or build it into the image."
+
+[[limit]]
+id = "lan-address"
+ask = "A LAN address of the VM's own (DHCP, a fixed MAC, bridged)"
+group = "flk-change"
+why = "VMs live on flk's private 172.30.0.0/24 network behind the host. Managed extra addresses are planned in flk's PLAN M5 (more than one host)."
+instead = "Forward host ports ([[services]]), and [flk] bind to a second address the host has (core/bind, later)."
+
+[[limit]]
+id = "gpu"
+ask = "Use the host's GPU"
+group = "impossible"
+why = "flk's Firecracker VMs have no device passthrough."
+instead = "Run GPU work on the host or another machine and call it over the network (see ~/ncm.flk)."
+
+[[limit]]
+id = "low-port"
+ask = "A host port below 1024 (80, 443, 53...)"
+group = "root"
+why = "flk refuses host ports below 1024 unless the host's setup allows them."
+instead = "As root: sudo FLK_MIN_PORT=N ~/flk/setup-host.sh (N = the lowest port to allow). Or use a port of 1024 and up."
+
+[[limit]]
+id = "shell"
+ask = "A shell in the VM"
+group = "flk"
+why = "flk ssh console and flk exec already reach any running machine through flk's agent, with no sshd or network."
+instead = "flk ssh console; flk exec CMD. core/sshd (later) is only for clients that need real SSH, such as editors' remote modes."
+
+[[limit]]
+id = "systemd"
+ask = "Run systemd (or several services under an init system)"
+group = "impossible"
+why = "flk's init is PID 1 and runs one app; there's no systemd in the guest."
+instead = "Run each daemon in the foreground: as the app, or started by a start script or flk-run's prestart hook. Or one app per VM."
+
+[[limit]]
+id = "docker-in-vm"
+ask = "Run Docker or podman containers inside the VM"
+group = "flk-change"
+why = "Untested on flk's guest kernel and init (cgroups, overlayfs, networking); nothing in flk sets it up."
+instead = "Make each container its own flk app (flk can use an image directly: [build] image)."

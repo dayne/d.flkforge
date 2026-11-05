@@ -37,8 +37,7 @@ real apps and the boot service run main):
 - (M1) Volume names: flk's backup file names only allow `[a-z0-9_]`, so
   `core/volume` refuses dashes. Confirm with the flk session whether
   `flk volumes create` itself refuses them, and match it exactly.
-- (M2) `check` can't tell whether the app is deployed, only registered:
-  read `flk status --json` for the release and machine state.
+- ~~(M2) check: deployed or only registered~~: done (flk status --json).
 - (M2) Show the diff itself on drift (now: the `diff -u` command to run).
 - (M2) How much of flk's own help to show inline versus pointing at
   `flk help ...`. Inline text goes stale; pointers don't.
@@ -51,6 +50,13 @@ real apps and the boot service run main):
 - Publishing: `flkforge hub publish` from a recipe, and what gets
   stripped (site-specific values, secret names?).
 - Whether lazyflk browses the hub too.
+
+## From M2's agent test
+
+- The report could show the port mapping (host 6390 -> VM 6390/tcp).
+- App-specific snippets (redis, postgres, mosquitto) that tie the
+  program's own config (its port, its data dir, foreground mode) to the
+  service and volume params, so they can't drift apart (M3).
 
 ## Ideas
 

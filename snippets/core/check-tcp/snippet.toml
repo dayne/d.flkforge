@@ -1,0 +1,43 @@
+id = "core/check-tcp"
+version = "0.1.0"
+title = "TCP health check"
+category = "check"
+summary = "A deploy waits until a TCP port accepts connections; one that doesn't rolls back."
+multi = true
+source = "~/minecraft.flk/flk.toml, ~/flk/examples/reference/flk.toml"
+
+[params.name]
+type = "string"
+default = "tcp"
+prompt = "Check name ([checks.NAME])"
+validate = '^[a-z0-9_-]+$'
+
+[params.port]
+type = "port"
+required = true
+prompt = "Port inside the VM"
+
+[params.grace]
+type = "duration"
+default = "60s"
+prompt = "How long it may take to accept connections after boot"
+
+[[flktoml]]
+text = '''
+# A deploy waits for this port to accept connections; a machine that
+# doesn't within grace_period goes back to its previous release.
+[checks.{{.P.name}}]
+  type = "tcp"
+  port = {{.P.port}}
+  grace_period = {{toml .P.grace}}
+'''
+
+[hints]
+what = "Adds a tcp check to [checks]: deploys wait for the port."
+under_the_hood = """
+After booting a machine, flk deploy connects to MACHINE_IP:PORT until it
+accepts, for up to grace_period. Accepting a connection says the process
+is listening, not that it's ready: a log check on the ready line says more.
+"""
+gotchas = ["UDP ports can't be checked this way: use core/check-log."]
+docs = ["flk help --all  (Config: [checks.NAME])", "flk help deploy"]

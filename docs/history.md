@@ -110,3 +110,41 @@ following the printed steps:
 - Reference: testdata/real/valheim.toml renders a flk.toml that flk reads
   exactly like valheim-flk's (parsed and machine_config, apart from the
   engine's RUN_* env); differences in valheim.notes.md.
+
+## 2026-11-04: M2 done (the agent path)
+
+Built: `templates` and `new --template T --set USE.PARAM=VALUE` (blank,
+web-service, daemon, steam-game; templates leave app-specific params
+open, and every open one is named with its fix at once); `add`, `rm`,
+`set [--unset]` (values read by the param's type; a failed edit changes
+nothing); `snippets show`; `explain` for snippets, rules, limits
+(`_limits.toml`: host-folder, lan-address, gpu, low-port, shell, systemd,
+docker-in-vm) and flk.toml keys (flk's own reference, read live from
+`flk help --all`), with a fallback search of the hints; rules as a
+catalog plus no-shell, live-backup-console, mount-owner, mount-hides,
+secret-in-env, private-key, guest-init, huge-pages; `check` adds host
+ports (flk's min_port, ports other apps forward), the deployed release
+and whether flk.toml changed since, and unset secrets; snippets
+base-image, entrypoint-clear, restart-always, check-tcp, secret, and
+vm huge_pages; `[seeded]` hashes, so a kept seed file whose recipe
+version moved on gets a note, and an untouched stub is a check warning
+and the Next step.
+
+Acceptance (PLAN M2):
+- A fresh agent, told only to build a Redis daemon as `flkt-forge-agent`
+  and to learn flkforge from its own help, `snippets`, `explain` and
+  `templates` (no repo files), did it with `templates`, `help new`,
+  `snippets show`, one `new --template daemon --set ...`, and an edit of
+  start.sh: `check` 0 FAIL on the first try. Its critique led to: the
+  stub warning and Next step (check had passed a `sleep infinity`
+  start.sh), the explain search, templates showing their params, and two
+  wording fixes. Not done: linking a program's own config (Redis's port,
+  dir) to the snippets' params; app-specific snippets are for M3.
+- Deployed by its printed steps: Redis answered PONG and SET/GET over
+  the forwarded port; `check` read release v1 with its machine started,
+  and after `flkforge set vm memory=512mb` warned that flk.toml changed
+  since v1. Destroyed.
+- Drift (hand edit, refused render, `.flkforge-new`, check naming it):
+  tested since M0 (`TestDrift`).
+- `check` also caught a real conflict during development: a trial broker
+  on host port 1883, which mqtt-flk forwards.

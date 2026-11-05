@@ -1,0 +1,23 @@
+id = "core/restart-always"
+version = "0.1.0"
+title = "Restart: always come back"
+category = "restart"
+summary = "flk restarts the VM after any exit, for infrastructure that must stay up (a broker, a database)."
+conflicts = ["core/restart-outer-net"]
+source = "~/mqtt.flk/flk.toml"
+
+[[flktoml]]
+text = '''
+[[restart]]
+  policy = "always"  # infrastructure: always come back
+'''
+
+[hints]
+what = "Sets [[restart]] policy = \"always\"."
+under_the_hood = """
+When the VM's main process exits for any reason (not a flk machine stop),
+flk boots the machine again, up to [[restart]] retries times in a row
+(default 10), with backoff up to 60s between tries.
+"""
+gotchas = ["Not for apps with their own restart loop (core/run-wrapper): use core/restart-outer-net there."]
+docs = ["flk help --all  (Config: [[restart]])"]

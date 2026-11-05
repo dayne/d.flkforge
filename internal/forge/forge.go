@@ -121,6 +121,14 @@ func (e *Env) Render(dir string, r *recipe.Recipe, opts RenderOpts) (*Outcome, e
 	}
 	var writes []write
 	hashes := map[string]string{}
+	// seeded: the hash of what each seed file's snippet writes now, so a
+	// later render can tell when the recipe's version changed.
+	seeded := map[string]string{}
+	for _, f := range res.Files {
+		if f.Own == snippet.Seed {
+			seeded[f.Path] = recipe.Hash(f.Content)
+		}
+	}
 	for _, f := range res.Files {
 		st := FileStatus{Path: f.Path, Own: f.Own, From: f.From}
 		full := filepath.Join(dir, f.Path)
@@ -130,6 +138,8 @@ func (e *Env) Render(dir string, r *recipe.Recipe, opts RenderOpts) (*Outcome, e
 			return nil, err
 		}
 		switch {
+		case f.Own == snippet.Seed && exists && !bytes.Equal(disk, f.Content) && r.Seeded[f.Path] != recipe.Hash(f.Content) && r.Seeded[f.Path] != "":
+			st.Status, st.Note = "kept", "yours, so it's kept; the recipe's version changed since it was written: edit the file, or delete it and render to get the new one"
 		case f.Own == snippet.Seed && exists:
 			st.Status, st.Note = "kept", "yours: flkforge only writes it when it's missing"
 		case f.Own == snippet.Seed:
@@ -205,6 +215,7 @@ func (e *Env) Render(dir string, r *recipe.Recipe, opts RenderOpts) (*Outcome, e
 	r.Flkforge = e.Version
 	r.Lock = map[string]any{"flkforge": e.Version}
 	r.Render = hashes
+	r.Seeded = seeded
 	if err := writeFile(filepath.Join(dir, recipe.File), []byte(r.Format()), 0o644); err != nil {
 		return nil, err
 	}
@@ -283,7 +294,7 @@ func (e *Env) New(dir string, r *recipe.Recipe, opts NewOpts) (*Outcome, error) 
 	if err := recipe.CheckAppName(r.App); err != nil {
 		return nil, err
 	}
-	r.Render = nil // a recipe from elsewhere: nothing here was written by it
+	r.Render, r.Seeded = nil, nil // a recipe from elsewhere: nothing here was written by it
 	ro := opts.RenderOpts
 	ro.Force = false // never overwrite files that are already there
 	return e.Render(dir, r, ro)

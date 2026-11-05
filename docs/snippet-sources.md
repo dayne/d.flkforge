@@ -41,7 +41,7 @@ if it's cheap to find out.
 
 | Snippet | What | Learned from |
 |---|---|---|
-| `run-wrapper` | a generic `*-run` bash wrapper: graceful stop (console line / SIGINT / SIGTERM), STOP_TIMEOUT, restart loop (RESTART_DELAY, MAX_RESTARTS, RESTART_WINDOW), give up → VM off, ready-line detection, optional gamebus events | mc-run, vs-run, vh-run, en-run: read all four and extract what they share; params cover how they differ |
+| `run-wrapper` | the `flk-run` engine, copied as is (SPEC 6.6): graceful stop (console line / signal), STOP_TIMEOUT escalation, restart loop (RESTART_DELAY, MAX_RESTARTS, RESTART_WINDOW), give up → VM off, ready line, `server.*` events; plus stub `prestart` / `watch` / `poststop` hooks for what's specific to the app | mc-run, vs-run, vh-run, en-run (what they share is the engine; how they differ goes in hooks), mqtt-run (`--exec`) |
 | `gamebus-events` | the `gamebus_event` function, copied verbatim with its "keep in step" marker | `~/m.gamebus/adapters/gamebus-event.sh`, `SPEC.md` |
 | `restart-outer-net` | `[[restart]] on-failure, retries = 1` with the comment explaining why | the four game flk.tomls |
 | `restart-always` | infrastructure that always comes back | mqtt.flk |

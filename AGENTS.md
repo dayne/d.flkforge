@@ -31,7 +31,10 @@ Read, in this order:
   (github.com/dayne/d.flk), and another agent leads it. When flkforge
   needs something flk doesn't have (a validation command, a JSON field),
   write it up in `BUGS.flk.md` in this repo (format in its header) and tell
-  the user. Never patch `~/flk`, and don't work around a gap by reading
+  the user. You may also message the flk agent's session directly with the
+  request or a question (Dayne, 2026-11-04), but `BUGS.flk.md` stays the
+  record. Watch `~/flk`'s git log and `PLAN.md` M6 for items that land.
+  Never patch `~/flk`, and don't work around a gap by reading
   flk's state directory (`~/.local/share/flk`).
 - **Learn flk from flk, not from memory.** `flk help --all` is the full
   reference, including the flk.toml subset. `flk help --all --json` has the

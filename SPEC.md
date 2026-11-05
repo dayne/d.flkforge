@@ -112,12 +112,14 @@ ARG STEAM_BUILDID=latest
 RUN for try in 1 2 3; do ... done
 '''
 
+# flk.toml fragments are records, not raw TOML text (section 6.2): a
+# table path, a key, a value (templated, then parsed as a TOML value) and
+# the comment that goes above it.
 [[flktoml]]
-text = '''
-[build]
-  # The Steam build this release runs. Bump it to upgrade.
-  args = { STEAM_BUILDID = "{{.P.build_id}}" }
-'''
+table = "build.args"
+key = "STEAM_BUILDID"
+value = '"{{.P.build_id}}"'
+comment = "The Steam build this release runs. Bump it to upgrade."
 
 [hints]
 what = "Downloads the server with steamcmd in a build stage and copies it into the runtime image."
@@ -169,7 +171,9 @@ params = { port = 2456, protocol = "udp" }
 # ...
 
 [lock]                         # written by render; don't edit
-"core/steamcmd" = { version = "1.0.0", sha256 = "..." }
+flkforge = "0.1.0"             # v1: every snippet is built in, so the binary's version is the lock
+# with non-embedded sources (user dirs, later the hub), per snippet:
+# "core/steamcmd" = { version = "1.0.0", sha256 = "..." }
 
 [render]                       # written by render: hashes of the files it wrote (drift detection)
 Dockerfile = "sha256:..."
@@ -209,10 +213,16 @@ doesn't invalidate the expensive layers. Say so in a hint.
 
 ### 6.2 flk.toml
 
-Fragments are parsed as TOML and merged: tables merge, arrays of tables
+Fragments are structured records, not TOML text: `table` (a dotted path,
+or `[[name]]` with an entry key for arrays of tables), `key`, `value`
+(a TOML value after templating), and an optional `comment`. A record
+with no key and only a comment gives a table its leading comment. Merging
+works on records: tables merge, entries of arrays of tables
 (`[[services]]`, `[[mounts]]`) append, and a scalar set twice is a
 conflict unless the snippet declares a merge rule (`max` for
-`kill_timeout`, for example). Output comes from flkforge's own writer, not
+`kill_timeout`, for example). Records were chosen (2026-11-04) over
+merging TOML text because a TOML parser drops comments, and keeping the
+comments is the point. Output comes from flkforge's own writer, not
 a generic TOML encoder, so it keeps the comments from the fragments and
 uses the house section order (primer section 5). Any keys outside the
 known order go at the end. `[env]` keeps the order of the snippets that
@@ -263,6 +273,54 @@ real apps' history:
 whose hash no longer matches was edited by hand. flkforge then doesn't
 overwrite it: it writes `FILE.flkforge-new`, shows a diff, and exits 1,
 unless `--force` is given. `check` reports drift without writing anything.
+
+### 6.6 The run engine (`flk-run`) and its hooks
+
+Decided 2026-11-04, after reading mc-run, vs-run, vh-run, en-run and
+mqtt-run side by side. The four game wrappers share, almost line for
+line: flk's SIGTERM turned into the server's own stop (a console line
+through a FIFO held open on fd 3, or a signal), escalation after
+`STOP_TIMEOUT` (SIGTERM, or SIGKILL plus a cleanup command for Wine), the
+restart loop (`RESTART_DELAY`, `MAX_RESTARTS`, `RESTART_WINDOW`, give up
+and the VM powers off), `finish`, the `server.*` gamebus events and the
+`gamebus_event` function. What they don't share is specific to each game:
+log lines turned into player events, checks before start, and config
+written from env (vh's access lists, en's JSON with bans kept).
+
+So the wrapper isn't generated from a template. It's **one versioned
+bash script, `flk-run`**, copied as is from the snippet's `files/` (it
+carries a `# flk-run vN` line, like `gamebus-event.sh v1`), configured
+by `[env]`:
+
+    RUN_NAME        log prefix and event source (default: the app name)
+    RUN_STOP        console:LINE | signal:INT|TERM|...   how to stop gracefully
+    RUN_ESCALATE    TERM | KILL, plus an optional RUN_ESCALATE_CMD (wineserver -k)
+    RUN_READY       regex; the first match emits server.online
+    RUN_FILTER      regex; matching lines are dropped from the log
+    STOP_TIMEOUT RESTART_DELAY MAX_RESTARTS RESTART_WINDOW   as today
+    RUN_EVENTS      1 = print gamebus events (default 1)
+
+and the command after `--` (`CMD ["flk-run", "--", "java", ...]`).
+The app-specific parts are optional hook files next to it, which
+flkforge writes as commented stubs and the admin owns:
+
+- `prestart`: runs before each start, and a non-zero exit is fatal
+  (checks, writing config from env). It runs before every restart, not
+  just the first start, because en-run rewrites its config each time.
+- `watch`: sourced by the engine, it defines `on_line LINE`, which is
+  called for each output line after filtering, along with `event` and
+  `console TEXT` (writes to the server console, for vs-style polling).
+- `poststop`: runs after the server exits (en-run keeps its bans here).
+
+A daemon that needs no supervision (mqtt-run: setup, then `exec`) uses
+`flk-run --exec`, which runs `prestart` and then `exec`s the command, or
+just a `prestart` and a plain CMD. The engine needs bash; on Alpine
+bases the `run-wrapper` snippet adds the package, and the `--exec`
+form works in POSIX sh.
+
+Fixing the engine in its snippet reaches every app on its next render.
+Drift detection covers the engine, not the hooks: the hooks belong to
+the admin from the moment they're written.
 
 ## 7. Validation and `check`
 
@@ -407,7 +465,9 @@ and help (`~/flk/lib/flk/commands.rb`).
 
 - Snippet ids are `namespace/name`. `core` is reserved for built-ins, and
   hub namespaces will be owners (`dayne/valheim`).
-- Versions are semver. Recipes lock version + content sha256, so a recipe
+- Versions are semver. Recipes lock version + content sha256 (per-snippet
+  entries are written only for snippets outside the binary; until then the
+  flkforge version is the lock), so a recipe
   from the hub renders the same anywhere.
 - `internal/source` is an interface (`List`, `Get(id, version)`) from the
   start. Embedded and directory sources implement it in v1; the hub is a
@@ -433,3 +493,9 @@ recipe's `[[vm]]` gives; fly.io deployment.
   ("genma"), checked against flk: guest rules in 6.4, the persistence
   question in step 6, the four-part report in step 13, asks that aren't
   snippets (8.1), and default names from the directory.
+- 2026-11-04: planning review with Dayne as flkforge's lead: flk.toml
+  fragments are structured records (6.2); the run wrapper is one
+  versioned engine, `flk-run`, plus hooks the admin owns (6.6); the lock
+  holds only the flkforge version while every snippet is built in (5,
+  10). The milestones were reordered in PLAN.md: CLI and agents first,
+  a vertical slice first, the wizard last.

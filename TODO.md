@@ -7,11 +7,16 @@ depends on them; ask the user when it's their call.
 
 - (M0) Final `snippet.toml` field names. The sketch in SPEC 4 is a
   starting point; settle it and update the SPEC.
-- (M0) Forms: `huh` (if a bubbletea-v2 version exists) or hand-built
-  widgets.
-- (M1) One generic run wrapper with params, or a small family
-  (console-stop, signal-stop)? Decide after reading all four `*-run`
-  scripts side by side.
+- ~~(M0) Forms~~: decided 2026-11-04: `charm.land/huh/v2` exists
+  (v2.0.3); use it for the forms (M4). The preview and hint panes are
+  built on bubbletea.
+- ~~(M1) Run wrapper shape~~: decided 2026-11-04: one versioned engine
+  (`flk-run`) plus hooks the admin owns (SPEC 6.6).
+- (M1) The engine's exact env names and hook interface: settle them while
+  writing its test suite, then update SPEC 6.6.
+- (M1) The fake server for the M1 deploy test: a few lines of bash, or
+  a tiny Go binary built in a stage. Bash is enough unless it needs to
+  behave like a real server in some way bash can't.
 - (M1) Should generated files carry a "made by flkforge" header? Leaning
   towards one comment line in each file pointing at `flkforge.toml`,
   since the drift hashes do the real work.

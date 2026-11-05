@@ -39,7 +39,8 @@ text = '''
   grace_period = {{toml .P.grace}}
 '''
 
-# Remove when flk fixes it (BUGS.flk.md #1).
+# Fixed in flk 4294558 (branch r1-reliability). Remove this when that is
+# merged into main: the real apps and the boot service run main (BUGS.flk.md #1).
 [[next]]
 kind = "gap"
 text = "flk 0.1.0's deploy crashes on type = \"http\" checks (NameError: Flk::Net::HTTP)"

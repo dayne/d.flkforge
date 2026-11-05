@@ -47,3 +47,5 @@ natural check for a web service (the `web-service` template, PLAN M3).
 pointing here. Without a check, a deploy waits for `internal_port`.
 
 **Asked:** fix the constant, and a test case with an http check.
+
+Status: fixed in flk 4294558 (branch r1-reliability, not on main yet): `::Net` in `check_passes?`, both the request and the rescue list (the rescue raised the same NameError). Test: `tests/cases/10-hello.sh` test_http_checks_gate_the_deploy (200 deploys, 500 fails the check and rolls back).

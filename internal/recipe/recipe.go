@@ -91,6 +91,9 @@ func Parse(data []byte) (*Recipe, error) {
 		if len(k) >= 3 && k[0] == "use" && k[1] == "params" {
 			continue
 		}
+		if len(k) >= 3 && k[0] == "lock" { // a hub snippet's entry: version, sha256, origin
+			continue
+		}
 		unknown = append(unknown, k.String())
 	}
 	if len(unknown) > 0 {

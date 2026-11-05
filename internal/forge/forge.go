@@ -18,6 +18,7 @@ import (
 	"github.com/BurntSushi/toml"
 
 	"github.com/dayne/d.flkforge/internal/flk"
+	"github.com/dayne/d.flkforge/internal/hub"
 	"github.com/dayne/d.flkforge/internal/recipe"
 	"github.com/dayne/d.flkforge/internal/render"
 	"github.com/dayne/d.flkforge/internal/snippet"
@@ -32,12 +33,55 @@ type Env struct {
 	FlkErr  error       // why Flk is nil
 	// UserSnippets is the user's snippet directory ("" for none).
 	UserSnippets string
+	// Hubs is the hubs config file ("" for none: SPEC 10).
+	Hubs string
 }
+
+// HubSource is a hub's checkout as a snippet source. It refuses snippets
+// and templates in namespace core: those are flkforge's own.
+type HubSource struct {
+	source.FS
+}
+
+func (h HubSource) List() ([]*snippet.Snippet, error) {
+	list, err := h.FS.List()
+	for _, s := range list {
+		if strings.HasPrefix(s.ID, "core/") {
+			return nil, fmt.Errorf("%s has %s: namespace core is flkforge's own; a hub can't replace it", h.Label, s.ID)
+		}
+	}
+	return list, err
+}
+
+func (h HubSource) Templates() ([]*source.Template, error) {
+	list, err := h.FS.Templates()
+	for _, t := range list {
+		if strings.HasPrefix(t.ID, "core/") {
+			return nil, fmt.Errorf("%s has template %s: namespace core is flkforge's own", h.Label, t.ID)
+		}
+	}
+	return list, err
+}
+
+// HubLabel is the origin of snippets from a hub.
+func HubLabel(name string) string { return "hub " + name }
+
+// HubConfig loads the hubs config.
+func (e *Env) HubConfig() (*hub.Config, error) { return hub.Load(e.Hubs) }
 
 // Catalog loads the snippets an app directory sees: built in, the
 // user's, then the app's own (SPEC 3).
 func (e *Env) Catalog(dir string) (*source.Catalog, error) {
 	srcs := []source.Source{source.FS{Label: "built in", FS: snippets.FS}}
+	hubs, err := e.HubConfig()
+	if err != nil {
+		return nil, err
+	}
+	for _, h := range hubs.Hubs {
+		if h.Cloned() {
+			srcs = append(srcs, HubSource{source.FS{Label: HubLabel(h.Name), FS: os.DirFS(h.Path)}})
+		}
+	}
 	if e.UserSnippets != "" {
 		srcs = append(srcs, source.Dir(e.UserSnippets))
 	}
@@ -91,6 +135,8 @@ type RenderOpts struct {
 	Force         bool // overwrite hand-edited files
 	AllowWarnings bool // write even if flk config show warns
 	DryRun        bool // compute everything, write nothing
+	// Relock accepts hub snippets that changed since the recipe locked them.
+	Relock bool
 }
 
 // Render renders the recipe in dir and writes the files (SPEC 6.5): a
@@ -106,6 +152,14 @@ func (e *Env) Render(dir string, r *recipe.Recipe, opts RenderOpts) (*Outcome, e
 		return nil, err
 	}
 	out := &Outcome{Dir: dir, App: r.App, Findings: res.Findings, Steps: res.Steps, Ports: ports(res.File("flk.toml").Content)}
+	lock, changed, err := hubLock(r, cat)
+	if err != nil {
+		return nil, err
+	}
+	if len(changed) > 0 && !opts.Relock {
+		out.Refused = "hub snippets changed since the recipe locked them: " + strings.Join(changed, "; ") + " (flkforge hub show ID to read them; render --relock accepts them)"
+		return out, nil
+	}
 	e.hostSteps(dir, out)
 	out.Steps = editedSteps(dir, res, out.Steps)
 	if errs := res.Errors(); len(errs) > 0 {
@@ -221,6 +275,9 @@ func (e *Env) Render(dir string, r *recipe.Recipe, opts RenderOpts) (*Outcome, e
 	}
 	r.Flkforge = e.Version
 	r.Lock = map[string]any{"flkforge": e.Version}
+	for k, v := range lock {
+		r.Lock[k] = v
+	}
 	r.Render = hashes
 	r.Seeded = seeded
 	if err := writeFile(filepath.Join(dir, recipe.File), []byte(r.Format()), 0o644); err != nil {
@@ -463,4 +520,33 @@ func ports(flkToml []byte) []string {
 		}
 	}
 	return out
+}
+
+// hubLock is the lock entries of the recipe's hub snippets (version,
+// content hash, origin), and the ones that changed since the recipe's
+// lock recorded them.
+func hubLock(r *recipe.Recipe, cat *source.Catalog) (map[string]any, []string, error) {
+	lock := map[string]any{}
+	var changed []string
+	for _, u := range r.Uses {
+		s, err := cat.Get(u.Snippet)
+		if err != nil || !strings.HasPrefix(s.Origin, "hub ") {
+			continue
+		}
+		sum, err := hub.Hash(s.FS, s.Dir)
+		if err != nil {
+			return nil, nil, err
+		}
+		lock[s.ID] = map[string]any{"version": s.Version, "sha256": sum, "origin": s.Origin}
+		if old, ok := r.Lock[s.ID].(map[string]any); ok && old["sha256"] != sum {
+			changed = append(changed, fmt.Sprintf("%s (now %s, %s)", s.ID, s.Version, s.Origin))
+		}
+	}
+	return lock, changed, nil
+}
+
+// Locked says whether the recipe's lock already has this snippet.
+func Locked(r *recipe.Recipe, id string) bool {
+	_, ok := r.Lock[id].(map[string]any)
+	return ok
 }

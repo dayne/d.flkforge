@@ -37,8 +37,8 @@ flkforge never deploys and never needs root. It finishes with the flk
 commands to run next (`flk launch --no-deploy`, `flk volumes create ...`,
 `flk secrets set ...`, `flk deploy`).
 
-Later: a **hub** of shared snippets and whole-app recipes
-(`flkforge hub search valheim`).
+A **hub** shares snippets and whole-app recipes through git repos
+(`flkforge hub add NAME URL`, `hub search`, `hub publish`): SPEC 10.
 
 Status: M4 (2026-11-05). The wizard (`new` and `edit` in a terminal),
 the command line for agents and scripts, flk-run, and a catalog of 52

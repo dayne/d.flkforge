@@ -28,6 +28,7 @@ var jsonOpt = Opt{Name: "json", Help: "Print JSON instead of text"}
 // editOpts are the options of the commands that change a recipe and render.
 var editOpts = []Opt{
 	{Name: "force", Help: "Overwrite files that were changed by hand"},
+	{Name: "relock", Help: "Accept hub snippets that changed since the recipe locked them"},
 	{Name: "allow-warnings", Help: "Write even if flk config show warns about the new flk.toml"},
 	{Name: "dry-run", Help: "Show what would change; write nothing"},
 	jsonOpt,
@@ -59,6 +60,7 @@ func init() {
 				{Name: "app", Arg: "NAME", Help: "App name (default: the recipe's, else from DIR: foo.flk -> foo-flk)"},
 				{Name: "yes", Help: "Write without asking (needed without a terminal)"},
 				{Name: "force", Help: "DIR already has a Dockerfile or flk.toml: write next to them (they're never overwritten)"},
+				{Name: "trust", Help: "The recipe or template uses hub snippets: use them (read them first: flkforge hub show ID)"},
 				{Name: "allow-warnings", Help: "Write even if flk config show warns about the new flk.toml"},
 				{Name: "hints", Arg: "LEVEL", Help: "The wizard's starting hint level: full (default), summary or minimal"},
 				jsonOpt,
@@ -79,12 +81,7 @@ func init() {
 			}},
 		{Name: "render", Args: "[DIR]", run: cmdRender, JSON: true,
 			Summary: "Rewrite the app's files from DIR/flkforge.toml",
-			Opts: []Opt{
-				{Name: "force", Help: "Overwrite files that were changed by hand"},
-				{Name: "allow-warnings", Help: "Write even if flk config show warns about the new flk.toml"},
-				{Name: "dry-run", Help: "Show what would change; write nothing"},
-				jsonOpt,
-			},
+			Opts:    editOpts,
 			Notes: []string{
 				"A file changed by hand since the last render isn't overwritten: the new version goes to FILE.flkforge-new and render exits 1.",
 				"Files a snippet seeds (a start script) are written only when missing; after that they're yours.",
@@ -101,6 +98,7 @@ func init() {
 			Summary: "Add a snippet to DIR's recipe, then render",
 			Opts: append([]Opt{
 				{Name: "id", Arg: "ID", Help: "The use's id (needed when the snippet is used more than once)"},
+				{Name: "trust", Help: "Use a hub snippet the recipe hasn't locked yet (read it first: flkforge hub show ID)"},
 				{Name: "set", Arg: "PARAM=VALUE", Multi: true, Help: "Set one of its params"},
 			}, editOpts...),
 			Notes: []string{
@@ -129,6 +127,24 @@ func init() {
 				"Reads SRC's flk.toml, Dockerfile and the files they copy; never changes them (--in-place adds flkforge.toml only).",
 				"What matches a snippet becomes it; the rest is kept as is in core/flk-toml and core/dockerfile-lines. Every decision is a note.",
 				"Without --to or --in-place the recipe goes to stdout and the notes to stderr: flkforge import ~/app > recipe.toml.",
+			}},
+		{Name: "hub", Args: "[SUB] [ARGS...]", run: cmdHub, JSON: true,
+			Summary: "Shared snippets and recipes in git repos: hub list|add|rm|pull|search|show|publish",
+			Opts: []Opt{
+				{Name: "path", Arg: "DIR", Help: "add: use a clone you already have, in place"},
+				{Name: "hub", Arg: "NAME", Help: "publish: the hub to publish to"},
+				{Name: "as", Arg: "NS/NAME", Help: "publish: the id in the hub (default: the snippet's, or HUB/APP for a recipe)"},
+				{Name: "branch", Arg: "B", Help: "publish: commit on this branch (default: a new flkforge/publish-NAME, for review)"},
+				{Name: "current", Help: "publish: commit on the branch that's checked out"},
+				{Name: "title", Arg: "T", Help: "publish a recipe: its title"},
+				{Name: "summary", Arg: "S", Help: "publish a recipe: what it's for (hub search shows it)"},
+				jsonOpt,
+			},
+			Notes: []string{
+				"A hub is a git repo laid out like the built-in catalog: NAMESPACE/NAME/snippet.toml, NAMESPACE/_templates/NAME.toml. Hubs are in ~/.config/flkforge/hubs.toml.",
+				"hub add NAME URL clones into ~/.local/share/flkforge/hubs/NAME on hub pull; hub add NAME --path DIR uses your clone in place. pull is git clone / git pull --ff-only.",
+				"Hub snippets join the catalog (snippets, explain, the wizard). flkforge add ID needs --trust for one the recipe hasn't locked yet: hub show ID prints every file first. The recipe locks its version and sha256; a render refuses if it changed (render --relock accepts it).",
+				"hub publish SRC copies a snippet directory, or an app's recipe as a template (app name and host addresses stripped), into the hub's checkout and commits it on a new branch for review (--current: the checked-out branch). flkforge never pushes.",
 			}},
 		{Name: "snippets", Args: "[SUB] [ID]", run: cmdSnippets, JSON: true,
 			Summary: "List the snippets (snippets [list]), or show one's params (snippets show ID)",

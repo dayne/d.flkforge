@@ -21,6 +21,7 @@ func cmdRender(c *ctx) int {
 		Force:         c.has("force"),
 		AllowWarnings: c.has("allow-warnings"),
 		DryRun:        c.has("dry-run"),
+		Relock:        c.has("relock"),
 	})
 	if err != nil {
 		return c.errorf("%v", err)

@@ -78,6 +78,15 @@ func cmdNew(c *ctx) int {
 			return c.errorf("--set %s: %v", kv, err)
 		}
 	}
+	var untrusted []string
+	for _, u := range r.Uses {
+		if s, err := cat.Get(u.Snippet); err == nil && strings.HasPrefix(s.Origin, "hub ") && !forge.Locked(r, s.ID) {
+			untrusted = append(untrusted, s.ID+" ("+s.Origin+")")
+		}
+	}
+	if len(untrusted) > 0 && !c.has("trust") {
+		return c.errorf("the recipe uses hub snippets: %s. They run as build steps and in your VMs: read them (flkforge hub show ID), then add --trust", strings.Join(untrusted, ", "))
+	}
 	out, err := c.env().New(dir, r, forge.NewOpts{App: c.opt("app"), Force: c.has("force"), RenderOpts: forge.RenderOpts{AllowWarnings: c.has("allow-warnings")}})
 	if err != nil {
 		return c.renderError(err, "new")
@@ -151,6 +160,7 @@ func (c *ctx) editRecipe(dir string, change func(*recipe.Recipe, *source.Catalog
 		Force:         c.has("force"),
 		AllowWarnings: c.has("allow-warnings"),
 		DryRun:        c.has("dry-run"),
+		Relock:        c.has("relock"),
 	})
 	if err != nil {
 		return c.renderError(err, "set")
@@ -168,6 +178,10 @@ func cmdAdd(c *ctx) int {
 		s, err := cat.Get(id)
 		if err != nil {
 			return err
+		}
+		if strings.HasPrefix(s.Origin, "hub ") && !forge.Locked(r, s.ID) && !c.has("trust") {
+			showSnippetFiles(c, s)
+			return fmt.Errorf("%s comes from %s, not flkforge: it runs as build steps and in your VMs. Read it above; add --trust to use it", s.ID, s.Origin)
 		}
 		u := recipe.Use{Snippet: s.ID, ID: c.opt("id"), Params: map[string]any{}}
 		for _, existing := range r.Uses {

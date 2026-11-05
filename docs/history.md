@@ -249,3 +249,17 @@ chmod before the COPY of its file, mqtt), all fixed. The imported mqtt
 Dockerfile built with podman (image removed after). Also: flk's r1 is on
 main (udp-only-check's reason updated; bases point at flk help
 dockerfile).
+
+## 2026-11-05: the hub (PLAN, Later)
+
+Dayne decided: git repos, published by Dayne and agents (agents on a
+branch), publish commits locally, lazyflk stays out. Built (SPEC 10):
+hubs.toml, hub list/add/rm/pull/search/show/publish, hub checkouts as
+catalog sources (no core namespace), --trust on add and new, per-snippet
+locks for hub snippets with refusal on change and --relock, publish
+with stripping onto a review branch. Tested end to end on a local git
+repo (TestHub): add, pull, search, show, refused without --trust, the
+lock, a change upstream refused until --relock, publish onto
+flkforge/publish-..., the published recipe found by search, publishing
+into core refused, rm. No real hub repo exists yet: creating one
+(github.com/dayne/flkforge-hub?) is Dayne's call.

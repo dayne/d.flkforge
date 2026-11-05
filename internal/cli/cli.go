@@ -10,6 +10,7 @@ import (
 
 	"github.com/dayne/d.flkforge/internal/flk"
 	"github.com/dayne/d.flkforge/internal/forge"
+	"github.com/dayne/d.flkforge/internal/hub"
 	"github.com/dayne/d.flkforge/internal/source"
 )
 
@@ -71,7 +72,7 @@ func (c *ctx) printJSON(v any) {
 
 // RealEnv finds flk and the user's snippet directory.
 func RealEnv() *forge.Env {
-	e := &forge.Env{Version: Version, UserSnippets: source.UserDir()}
+	e := &forge.Env{Version: Version, UserSnippets: source.UserDir(), Hubs: hub.ConfigFile()}
 	if x, err := flk.Find(); err != nil {
 		e.FlkErr = err
 	} else {

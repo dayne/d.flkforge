@@ -653,27 +653,58 @@ keeps the final USER and WORKDIR and puts every COPY before the RUNs
 that use it (the importer's tests). The imported mqtt Dockerfile was
 built with podman: same files, owners and modes.
 
-## 10. Hub readiness (built later, designed for now)
+## 10. The hub (built 2026-11-05)
 
-- Snippet ids are `namespace/name`. `core` is reserved for built-ins, and
-  hub namespaces will be owners (`dayne/valheim`).
-- Versions are semver. Recipes lock version + content sha256 (per-snippet
-  entries are written only for snippets outside the binary; until then the
-  flkforge version is the lock), so a recipe
-  from the hub renders the same anywhere.
-- `internal/source` is an interface (`List`, `Get(id, version)`) from the
-  start. Embedded and directory sources implement it in v1; the hub is a
-  third implementation (an HTTP index or a git repo, to be decided).
-- Templates and whole-app recipes are shareable units, alongside snippets.
-- A snippet's `source` field and its hints are what a hub page shows, so
-  write them well now.
-- Trust: hub snippets run as build steps and wrappers in the user's VMs,
-  so `add` from a non-local source shows the snippet's full text and asks
-  first. The hub itself, and signing, are open (`TODO.md`).
+Decided with Dayne (2026-11-05): hubs are **git repositories**;
+publishers are Dayne and agents, and agents' publishes go on a branch
+for Dayne to review; **publish commits locally** and nothing is pushed;
+lazyflk doesn't browse hubs (it can run flkforge).
+
+- **Layout**: a hub repo is laid out like the built-in catalog:
+  `NAMESPACE/NAME/snippet.toml` (+ `files/`, README.md) and
+  `NAMESPACE/_templates/NAME.toml` for whole-app recipes (templates).
+  Namespaces are owners (`dayne/...`); `core` is flkforge's own, and a
+  hub that has a core snippet or template doesn't load.
+- **Config**: `~/.config/flkforge/hubs.toml`, `[[hub]] name, url, path`.
+  `hub add NAME URL` clones into `~/.local/share/flkforge/hubs/NAME` (a
+  data directory, not a cache: it can hold unpushed commits) on
+  `hub pull`; `hub add NAME --path DIR` uses a clone the admin already
+  has, in place. `hub rm` drops it from the config and leaves the
+  checkout.
+- **Catalog**: each cloned hub is a source after the built-in one and
+  before the user's and the app's directories (`internal/forge`), so hub
+  snippets and recipes show in `snippets`, `templates`, `explain`,
+  `search` and the wizard's picker (marked with their hub).
+- **Commands**: `hub list|add|rm|pull|search|show|publish` (`--json`).
+  `pull` is `git clone` or `git pull --ff-only` (a checkout with commits
+  of its own is left alone). `show ID` prints every file of a snippet,
+  with its content hash, or a recipe.
+- **Trust**: `add ID` of a hub snippet the recipe hasn't locked prints
+  its every file and refuses without `--trust`; `new` refuses a recipe or
+  template that uses unlocked hub snippets without `--trust`. In the
+  wizard the picker and the hint say where it's from and point at
+  `hub show`.
+- **Lock**: every render records each hub snippet in `[lock]`: version,
+  `sha256` (of every file in its directory, `hub.Hash`) and origin. A
+  render whose hub snippet no longer matches its lock refuses (the
+  snippet changed upstream after a pull) until `render --relock`.
+  Built-in snippets aren't locked one by one (the flkforge version is),
+  nor are the user's own directories (they're the admin's).
+- **Publish**: `hub publish SRC --hub NAME` copies a snippet directory
+  (`--as NS/NAME` renames it) or an app's recipe as a template
+  (`--title`, `--summary` required; the app name, core/bind and the
+  render/seeded/lock tables are stripped, and values that look like IP
+  addresses are noted) into the checkout, and commits it, on a new
+  branch `flkforge/publish-NAME` by default (`--branch B`, or `--current`
+  for the checked-out branch). It refuses a checkout with uncommitted
+  changes, and never pushes: review, merge and push are the admin's.
+- Signing isn't built: trust is review (show, then --trust) plus the
+  lock. For hubs from other people, signed commits would be the next
+  step (TODO.md).
 
 ## 11. Not in v1
 
-The hub; running flk commands that change things (launch, deploy,
+Running flk commands that change things (launch, deploy,
 volumes, secrets); editing existing hand-written apps that have no
 recipe (import is in `TODO.md`); multi-machine apps beyond what one
 recipe's `[[vm]]` gives; fly.io deployment.
@@ -710,3 +741,5 @@ recipe's `[[vm]]` gives; fly.io deployment.
   (TODO.md).
 - 2026-11-05 (M4): the wizard as built (8.2): hand-built widgets instead
   of huh, ctrl-key bindings, placeholders in the preview, replace-on-add.
+- 2026-11-05: import (9.1) and the hub (10) built; the hub's design
+  decisions are Dayne's (git, Dayne and agents, commit locally).

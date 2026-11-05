@@ -467,9 +467,13 @@ func (m *Model) pickerLines(w, h int) []string {
 	for i := start; i < len(p.ids) && i < start+avail; i++ {
 		s, _ := m.o.Catalog.Get(p.ids[i])
 		name := strings.TrimPrefix(s.ID, "core/")
-		line := "  " + fmt.Sprintf("%-20s", name) + " " + stDim.Render(s.Summary)
+		summary := s.Summary
+		if strings.HasPrefix(s.Origin, "hub ") {
+			summary = "(" + s.Origin + ") " + summary
+		}
+		line := "  " + fmt.Sprintf("%-20s", name) + " " + stDim.Render(summary)
 		if i == p.focus {
-			line = stFocus.Render("› "+fmt.Sprintf("%-20s", name)) + " " + s.Summary
+			line = stFocus.Render("› "+fmt.Sprintf("%-20s", name)) + " " + summary
 		}
 		out = append(out, line)
 	}
@@ -555,6 +559,9 @@ func (m *Model) hintLines(w, h int) []string {
 	case m.picker != nil:
 		s, _ := m.o.Catalog.Get(m.picker.ids[m.picker.focus])
 		add(stBold.Render(s.ID) + ": " + s.Title)
+		if strings.HasPrefix(s.Origin, "hub ") {
+			add(stWarn.Render("From " + s.Origin + ", not flkforge: it runs as build steps and in your VMs. Read it first: flkforge hub show " + s.ID + ". The recipe locks its version."))
+		}
 		snippetHints(s)
 	case len(m.rows) == 0:
 	default:

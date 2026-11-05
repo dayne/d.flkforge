@@ -23,9 +23,10 @@ install: build ## build, and link it as ~/.local/bin/flkforge (once; then build 
 test: ## run the tests, golden ones included (the flk checks skip without flk)
 	go test ./...
 
-golden: ## rewrite the golden files after an intended change (review with git diff)
+golden: ## rewrite the golden files and wizard snapshots after an intended change (review with git diff)
 	go test ./internal/cli -run 'Golden' -update
-	@git diff --stat -- testdata
+	go test ./internal/wizard -run 'Snapshots' -update
+	@git diff --stat -- testdata internal/wizard/testdata
 
 check: ## what CI would run: gofmt, vet, build, race tests
 	@test -z "$$(gofmt -l .)" || { gofmt -l .; echo "gofmt: run gofmt -w on these"; exit 1; }

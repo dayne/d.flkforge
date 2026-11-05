@@ -108,6 +108,15 @@ and render code.
   The golden files change only on purpose: `make golden`, then read the
   `git diff`. Tests that need flk (the flk half of the M0 acceptance) skip
   without it; run them on the reference host.
+- The wizard (`internal/wizard`, SPEC 8.2) does no I/O: writing,
+  validation and the app-name check are callbacks. Its tests press keys
+  (`press`, `goStep`, `focusParam`, `pick` in wizard_test.go), compare
+  screens with golden snapshots at 80x24 and 160x48 (`make golden`
+  rewrites them; read the diff), and check every screen fills the
+  terminal exactly. Before calling a wizard change done, drive the real
+  binary in tmux (`tmux new-session -d -x 80 -y 24 'flkforge new DIR'`,
+  `send-keys`, `capture-pane -p`) as docs/screens/README.md describes:
+  M4's layout bugs only showed up there.
 - Adding a snippet: `snippets/core/NAME/snippet.toml` (SPEC 4). Check it
   with `go test ./internal/source` (it loads every built-in) and a recipe
   that uses it through `flkforge new ... --recipe`.
